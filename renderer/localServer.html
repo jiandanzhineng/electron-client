@@ -1,0 +1,39 @@
+<h2>本地启动服务端</h2>
+<div class="info">
+  <h3>服务端控制</h3>
+  <div class="server-controls">
+    <div class="server-status">
+      <span class="status-indicator" id="server-status-indicator"></span>
+      <span id="server-status-text">服务端状态: 未启动</span>
+    </div>
+    <div class="button-group">
+      <button id="start-server-btn" class="primary-btn">启动服务端</button>
+      <button id="stop-server-btn" class="danger-btn" disabled>停止服务端</button>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  <h3>服务端日志</h3>
+  <div id="server-logs" class="logs-container">
+    <p class="empty-log">暂无日志</p>
+  </div>
+</div>
+
+<div class="info">
+  <h3>服务端配置</h3>
+  <div class="config-form">
+    <div class="form-group">
+      <label for="server-port">端口号</label>
+      <input type="number" id="server-port" value="8080" min="1024" max="65535">
+    </div>
+    <div class="form-group">
+      <label for="server-mode">运行模式</label>
+      <select id="server-mode">
+        <option value="development">开发模式</option>
+        <option value="production">生产模式</option>
+      </select>
+    </div>
+    <button id="save-config-btn" class="secondary-btn">保存配置</button>
+  </div>
+</div>

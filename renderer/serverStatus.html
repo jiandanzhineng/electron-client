@@ -1,0 +1,42 @@
+<h2>服务端状态</h2>
+<div id="mqtt-status" class="mqtt-status mqtt-disconnected">
+  <div>
+    <span class="status-indicator status-disconnected" id="status-indicator"></span>
+    <span id="connection-status">MQTT连接状态: 未连接</span>
+  </div>
+  <button id="reconnect-button">重新连接</button>
+</div>
+
+<div class="status-checklist page-section">
+  <h3>服务端状态检测</h3>
+  <ul>
+    <li>
+      <span>服务器MDNS支持检测:</span>
+      <span class="status-indicator status-unknown"></span>
+      <span class="status-text">未知</span>
+    </li>
+    <li>
+      <span>MDNS解析检测:</span>
+      <span class="status-indicator status-unknown"></span>
+      <span class="status-text">未知</span>
+    </li>
+    <li>
+      <span>mqtt服务端在线检测:</span>
+      <span class="status-indicator status-unknown"></span>
+      <span class="status-text">未知</span>
+    </li>
+    <li>
+      <span>webapi在线检测:</span>
+      <span class="status-indicator status-unknown"></span>
+      <span class="status-text">未知</span>
+    </li>
+  </ul>
+  <button id="run-detection-button">运行检测</button>
+</div>
+
+<div id="mqtt-messages" class="info">
+  <h3>最近MQTT消息 <small>(订阅所有主题)</small></h3>
+  <div id="message-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+    <p class="empty-message">暂无消息</p>
+  </div>
+</div>

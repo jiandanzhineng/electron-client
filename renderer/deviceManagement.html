@@ -1,0 +1,67 @@
+<h2>设备管理</h2>
+<div class="info">
+  <h3>设备列表</h3>
+  <div class="device-controls">
+    <button id="refresh-devices-btn" class="secondary-btn">刷新设备列表</button>
+    <button id="add-device-btn" class="primary-btn">添加设备</button>
+  </div>
+  <div id="device-list" class="device-list-container">
+    <table class="device-table">
+      <thead>
+        <tr>
+          <th>设备名称</th>
+          <th>设备ID</th>
+          <th>设备类型</th>
+          <th>连接状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="device-table-body">
+        <tr class="empty-row">
+          <td colspan="5">暂无设备</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="info">
+  <h3>设备详情</h3>
+  <div id="device-details" class="device-details-container">
+    <p class="empty-details">请选择一个设备查看详情</p>
+  </div>
+</div>
+
+<!-- 添加设备模态框 -->
+<div id="add-device-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>添加新设备</h3>
+      <span class="close-modal">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="device-name">设备名称</label>
+        <input type="text" id="device-name" placeholder="输入设备名称">
+      </div>
+      <div class="form-group">
+        <label for="device-id">设备ID</label>
+        <input type="text" id="device-id" placeholder="输入设备ID">
+      </div>
+      <div class="form-group">
+        <label for="device-type">设备类型</label>
+        <select id="device-type">
+          <option value="light">智能灯</option>
+          <option value="switch">智能开关</option>
+          <option value="sensor">传感器</option>
+          <option value="camera">摄像头</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="cancel-add-device" class="secondary-btn">取消</button>
+      <button id="confirm-add-device" class="primary-btn">确认添加</button>
+    </div>
+  </div>
+</div>
