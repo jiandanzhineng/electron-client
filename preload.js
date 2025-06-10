@@ -18,8 +18,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Expose IPC methods for MQTT communication
   mqttConnect: (url, options) => ipcRenderer.send('mqtt-connect', url, options),
+  connectMqtt: (config) => ipcRenderer.invoke('connect-mqtt', config),
+  disconnectMqtt: () => ipcRenderer.invoke('disconnect-mqtt'),
   onMqttStatus: (callback) => ipcRenderer.on('mqtt-status', (event, status) => callback(status)),
-  onMqttMessage: (callback) => ipcRenderer.on('mqtt-message', (event, message) => callback(message))
+  onMqttMessage: (callback) => ipcRenderer.on('mqtt-message', (event, message) => callback(message)),
+  sendMqttMessage: (topic, payload) => ipcRenderer.send('mqtt-send-message', topic, payload),
+  
+  // Expose IPC methods for mDNS publishing
+  publishMDNS: (port) => ipcRenderer.invoke('publish-mdns', port),
+  runMDNSTool: (port) => ipcRenderer.invoke('run-mdns-tool', port),
+  stopMDNSTool: () => ipcRenderer.invoke('stop-mdns-tool'),
+  getMDNSToolStatus: () => ipcRenderer.invoke('get-mdns-tool-status'),
+  onMDNSStatusChange: (callback) => ipcRenderer.on('mdns-status-change', (event, status) => callback(status)),
+  onMDNSOutput: (callback) => ipcRenderer.on('mdns-output', (event, output) => callback(output)),
+  onMDNSError: (callback) => ipcRenderer.on('mdns-error', (event, error) => callback(error)),
+  
+  // Expose IPC methods for local server management
+  startLocalServer: (config) => ipcRenderer.invoke('start-local-server', config),
+  stopLocalServer: (processId) => ipcRenderer.invoke('stop-local-server', processId),
+  forceStopLocalServer: (processId) => ipcRenderer.invoke('force-stop-local-server', processId),
+  checkLocalServerStatus: () => ipcRenderer.invoke('check-local-server-status'),
+  onServerLog: (callback) => ipcRenderer.on('server-log', (event, log) => callback(log)),
+  onServerStatusChange: (callback) => ipcRenderer.on('server-status-change', (event, status) => callback(status)),
+  
+  // Expose IPC methods for MQTT Broker (EMQX) management
+  startMqttBroker: () => ipcRenderer.invoke('start-mqtt-broker'),
+  stopMqttBroker: () => ipcRenderer.invoke('stop-mqtt-broker'),
+  restartMqttBroker: () => ipcRenderer.invoke('restart-mqtt-broker'),
+  checkMqttBrokerStatus: () => ipcRenderer.invoke('check-mqtt-broker-status'),
+  
+  // Expose IPC methods for system information
+  getSystemUptime: () => ipcRenderer.invoke('get-system-uptime'),
+  getSystemInfo: () => ipcRenderer.invoke('get-system-info')
 });
 
-console.log('预加载脚本已执行');
+console.log('Preload script executed');

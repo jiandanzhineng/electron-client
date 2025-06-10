@@ -1,122 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>EasySmart Electron应用</title>
-  <link rel="stylesheet" href="./style.css">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electron Client</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #f5f6fa;
+    }
+    
+    #app {
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* 加载动画 */
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f5f6fa;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e1e8ed;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      margin-left: 15px;
+      color: #7f8c8d;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-  <div class="sidebar">
-    <h2>导航</h2>
-    <ul>
-      <li><a href="#home" class="nav-link active">首页</a></li>
-      <li><a href="#server-status" class="nav-link">服务端状态</a></li>
-      <li><a href="#local-server" class="nav-link">本地启动服务端</a></li>
-      <li><a href="#device-management" class="nav-link">设备管理</a></li>
-      <li><a href="#game-list" class="nav-link">玩法列表</a></li>
-    </ul>
-  </div>
-  <div class="main-content">
-    <div id="home" class="page-section active">
-      <h1>欢迎使用 EasySmart Electron</h1>
-      <p>这是一个基本的Electron应用程序。您可以在此基础上进行开发，构建跨平台的桌面应用。</p>
-      <div class="info">
-        <h3>关于Electron</h3>
-        <p>Electron是一个使用JavaScript、HTML和CSS构建跨平台桌面应用程序的框架。它基于Node.js和Chromium，让您可以使用Web技术创建原生应用程序体验。</p>
-      </div>
+  <div id="app">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">正在加载应用...</div>
     </div>
   </div>
-
-  <script>
-    // 导航切换逻辑
-    const navLinks = document.querySelectorAll('.nav-link');
-    const mainContent = document.querySelector('.main-content');
-    
-    navLinks.forEach(link => {
-      link.addEventListener('click', (event) => {
-        event.preventDefault();
-        
-        // 移除所有导航链接的active类
-        navLinks.forEach(nav => nav.classList.remove('active'));
-        // 添加active类到当前点击的链接
-        link.classList.add('active');
-        
-        // 获取目标页面ID
-        const targetId = link.getAttribute('href').substring(1);
-        
-        // 隐藏所有页面部分
-        // pageSections.forEach(section => section.classList.remove('active'));
-        // 显示目标页面部分
-        // document.getElementById(targetId).classList.add('active');
-
-        loadPage(targetId);
-      });
-    });
-
-    function loadPage(pageId) {
-      // 清空主内容区域
-      mainContent.innerHTML = '';
-
-      if (pageId === 'home') {
-        // 加载首页内容
-        const homeSection = document.createElement('div');
-        homeSection.id = 'home';
-        homeSection.className = 'page-section active';
-        homeSection.innerHTML = `
-          <h1>欢迎使用 EasySmart Electron</h1>
-          <p>这是一个基本的Electron应用程序。您可以在此基础上进行开发，构建跨平台的桌面应用。</p>
-          <div class="info">
-            <h3>关于Electron</h3>
-            <p>Electron是一个使用JavaScript、HTML和CSS构建跨平台桌面应用程序的框架。它基于Node.js和Chromium，让您可以使用Web技术创建原生应用程序体验。</p>
-          </div>
-        `;
-        mainContent.appendChild(homeSection);
-      } else if (pageId === 'server-status') {
-        // 加载服务端状态页面内容
-        loadPageContent('server-status', 'serverStatus.html', 'serverStatus.js', 'connectMQTT');
-      } else if (pageId === 'local-server') {
-        // 加载本地启动服务端页面内容
-        loadPageContent('local-server', 'localServer.html', 'localServer.js', 'initLocalServer');
-      } else if (pageId === 'device-management') {
-        // 加载设备管理页面内容
-        loadPageContent('device-management', 'deviceManagement.html', 'deviceManagement.js', 'initDeviceManagement');
-      } else if (pageId === 'game-list') {
-        // 加载玩法列表页面内容
-        loadPageContent('game-list', 'gameList.html', 'gameList.js', 'initGameList');
-      }
-    }
-
-    // 通用页面加载函数
-    function loadPageContent(pageId, htmlFile, jsFile, initFunction) {
-      fetch(`./renderer/${htmlFile}`)
-        .then(response => response.text())
-        .then(html => {
-          const pageSection = document.createElement('div');
-          pageSection.id = pageId;
-          pageSection.className = 'page-section active';
-          pageSection.innerHTML = html;
-          mainContent.appendChild(pageSection);
-
-          // 加载并执行对应的JavaScript文件
-          const script = document.createElement('script');
-          script.src = `./renderer/${jsFile}`;
-          script.onload = () => {
-            // 脚本加载完成后执行初始化逻辑
-            if (typeof window[initFunction] === 'function') {
-              window[initFunction]();
-            }
-          };
-          document.body.appendChild(script);
-        })
-        .catch(err => console.error(`Failed to load ${pageId} page:`, err));
-    }
-    
-    // 默认显示首页
-    // document.getElementById('home').classList.add('active');
-    // document.querySelector('.nav-link[href="#home"]').classList.add('active');
-    loadPage('home');
-    
-  </script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

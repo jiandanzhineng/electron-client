@@ -23,16 +23,16 @@ function initKeyboardShortcuts(mainWindow) {
         pressedKeys.has('alt') && 
         pressedKeys.has('l')) {
       
-      console.log('触发快捷键: Alt+Ctrl+L');
+      console.log('Triggered shortcut: Alt+Ctrl+L');
       
       // 切换开发者工具（控制台）
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (mainWindow.webContents.isDevToolsOpened()) {
           mainWindow.webContents.closeDevTools();
-          console.log('已关闭开发者工具');
+          console.log('Developer tools closed');
         } else {
           mainWindow.webContents.openDevTools();
-          console.log('已打开开发者工具');
+          console.log('Developer tools opened');
         }
       }
       
@@ -63,7 +63,7 @@ function initKeyboardShortcuts(mainWindow) {
         };
         
         if (event.altKey && event.ctrlKey && event.key.toLowerCase() === 'l') {
-          console.log('捕获到快捷键组合: Alt+Ctrl+L');
+          console.log('Captured shortcut combination: Alt+Ctrl+L');
         }
         
         window.electronAPI.sendKeyEvent('keydown', keyEvent);
@@ -82,7 +82,7 @@ function initKeyboardShortcuts(mainWindow) {
         window.electronAPI.sendKeyEvent('keyup', keyEvent);
       });
       
-      console.log('键盘事件监听已设置');
+      console.log('Keyboard event listeners set');
     `);
   });
   
@@ -92,7 +92,7 @@ function initKeyboardShortcuts(mainWindow) {
     global.keyUpHandler = null;
   });
   
-  console.log('键盘快捷键监听器已初始化');
+  console.log('Keyboard shortcut listener initialized');
 }
 
 module.exports = {
