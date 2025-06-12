@@ -22,8 +22,10 @@ jobs:
         
     - name: Install dependencies
       run: |
+        if (Test-Path ".npmrc") { Remove-Item ".npmrc" -Force }
         npm cache verify
         npm install
+      shell: powershell
       
     - name: Build application
       run: npm run dist
