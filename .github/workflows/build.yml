@@ -21,7 +21,9 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      run: npm install
+      run: |
+        npm cache clean --force
+        npm install
       
     - name: Build application
       run: npm run dist
