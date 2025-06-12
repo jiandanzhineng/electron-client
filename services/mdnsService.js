@@ -95,7 +95,14 @@ class MDNSService {
         this.mdnsProcess = null;
       }
 
-      const mdnsToolPath = path.join(__dirname, '..', 'tools', 'mdns_tool.exe');
+      // 获取正确的工具路径
+      let mdnsToolPath;
+      if (process.env.NODE_ENV === 'development') {
+        mdnsToolPath = path.join(__dirname, '..', 'inner-tools', 'mdns_tool.exe');
+      } else {
+        // 生产环境下，工具在 extraResources 中
+        mdnsToolPath = path.join(process.resourcesPath, 'inner-tools', 'mdns_tool.exe');
+      }
       this.mdnsProcess = spawn(mdnsToolPath, [port.toString()], {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true

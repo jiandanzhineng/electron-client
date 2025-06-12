@@ -59,12 +59,26 @@ export const useServiceStore = defineStore('service', {
 
     // 添加服务器日志
     addServerLog(log) {
-      const timestamp = new Date().toLocaleTimeString()
-      this.serverLogs.push({
-        timestamp,
-        message: log,
-        id: Date.now()
-      })
+      // 如果log是字符串，转换为对象格式
+      if (typeof log === 'string') {
+        const timestamp = new Date().toLocaleTimeString()
+        this.serverLogs.push({
+          timestamp,
+          message: log,
+          level: 'info',
+          service: 'System',
+          id: Date.now()
+        })
+      } else {
+        // 如果log已经是对象格式，直接使用
+        this.serverLogs.push({
+          timestamp: log.timestamp || new Date().toLocaleTimeString(),
+          message: log.message || '',
+          level: log.level || 'info',
+          service: log.service || 'System',
+          id: log.id || Date.now()
+        })
+      }
       
       // 限制日志数量，避免内存溢出
       if (this.serverLogs.length > 1000) {

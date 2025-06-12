@@ -5,10 +5,11 @@ const path = require('path');
 
 // 引入 electron-reloader，忽略tools目录避免日志文件变化触发重载
 // 临时注释掉 electron-reloader 来调试启动问题
-// require('electron-reloader')(module, {
-//   ignore: ['**/tools/**/*']
-// });
-
+if (process.env.NODE_ENV === 'development') {
+  require('electron-reloader')(module, {
+    ignore: ['**/tools/**/*']
+  });
+}
 // 引入键盘快捷键模块
 const { initKeyboardShortcuts } = require('./util/keyboardShortcuts');
 

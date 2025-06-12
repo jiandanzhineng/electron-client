@@ -155,8 +155,11 @@
             v-for="log in serviceStore.serverLogs" 
             :key="log.id" 
             class="log-entry"
+            :class="`log-${log.level}`"
           >
             <span class="log-timestamp">{{ log.timestamp }}</span>
+            <span class="log-service" v-if="log.service">[{{ log.service }}]</span>
+            <span class="log-level" :class="`level-${log.level}`">{{ getLevelText(log.level) }}</span>
             <span class="log-message">{{ log.message }}</span>
           </div>
         </div>
@@ -307,6 +310,16 @@ function clearLogs() {
 
 function toggleAutoScroll() {
   autoScroll.value = !autoScroll.value
+}
+
+function getLevelText(level) {
+  switch(level) {
+    case 'info': return 'ℹ️'
+    case 'success': return '✅'
+    case 'warning': return '⚠️'
+    case 'error': return '❌'
+    default: return 'ℹ️'
+  }
 }
 </script>
 
@@ -489,9 +502,52 @@ function toggleAutoScroll() {
   font-size: 11px;
 }
 
+.log-service {
+  color: #61dafb;
+  font-weight: bold;
+  margin-right: 8px;
+  font-size: 11px;
+}
+
+.log-level {
+  margin-right: 8px;
+  font-size: 12px;
+}
+
+.level-info {
+  color: #61dafb;
+}
+
+.level-success {
+  color: #98d982;
+}
+
+.level-warning {
+  color: #ffcc02;
+}
+
+.level-error {
+  color: #ff6b6b;
+}
+
 .log-message {
   color: #f8f8f2;
   flex: 1;
+}
+
+.log-entry.log-error {
+  background-color: rgba(255, 107, 107, 0.1);
+  border-left: 3px solid #ff6b6b;
+}
+
+.log-entry.log-success {
+  background-color: rgba(152, 217, 130, 0.1);
+  border-left: 3px solid #98d982;
+}
+
+.log-entry.log-warning {
+  background-color: rgba(255, 204, 2, 0.1);
+  border-left: 3px solid #ffcc02;
 }
 
 .config-panel {

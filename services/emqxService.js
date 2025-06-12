@@ -4,18 +4,224 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 const { spawn } = require('child_process');
+const { promisify } = require('util');
+const AdmZip = require('adm-zip');
+const { app } = require('electron');
 
 class EMQXService {
   constructor() {
     this.mainWindow = null;
-    this.emqxPath = path.join(__dirname, '..', 'tools', 'emqx', 'bin', 'emqx');
-    this.emqxCtlPath = path.join(__dirname, '..', 'tools', 'emqx', 'bin', 'emqx_ctl');
-    this.emqxWorkDir = path.join(__dirname, '..', 'tools', 'emqx');
+    // 在打包环境中，tools目录放在C盘根目录下避免中文路径问题
+    if (process.env.NODE_ENV === 'development') {
+      this.toolsDir = path.join(__dirname, '..', 'tools');
+    } else {
+      this.toolsDir = path.join('C:', 'easysmart', 'tools');
+    }
+    this.emqxWorkDir = path.join(this.toolsDir, 'emqx');
+    this.emqxPath = path.join(this.emqxWorkDir, 'bin', 'emqx.cmd');
+    this.emqxCtlPath = path.join(this.emqxWorkDir, 'bin', 'emqx_ctl.cmd');
+    this.emqxZipPath = path.join(this.toolsDir, 'emqx.zip');
+    this.downloadUrl = 'https://packages.emqx.io/emqx-ce/v5.3.1/emqx-5.3.1-windows-amd64.zip';
   }
 
   setMainWindow(window) {
     this.mainWindow = window;
+  }
+
+  /**
+   * 检查EMQX是否已安装
+   * @returns {boolean} 是否已安装
+   */
+  isEmqxInstalled() {
+    return fs.existsSync(this.emqxPath) && fs.existsSync(this.emqxCtlPath);
+  }
+
+  /**
+   * 发送日志到GUI
+   * @param {string} message 日志消息
+   * @param {string} level 日志级别
+   */
+  sendLogToGUI(message, level = 'info') {
+    if (this.mainWindow && this.mainWindow.webContents) {
+      this.mainWindow.webContents.send('server-log', {
+        timestamp: new Date().toISOString(),
+        level: level,
+        message: message,
+        service: 'EMQX'
+      });
+    }
+    console.log(message);
+  }
+
+  /**
+   * 下载文件
+   * @param {string} url 下载链接
+   * @param {string} filePath 保存路径
+   * @returns {Promise<void>}
+   */
+  async downloadFile(url, filePath) {
+    return new Promise((resolve, reject) => {
+      const message = `开始下载 EMQX 服务: ${url}`;
+      console.log(message);
+      this.sendLogToGUI(message, 'info');
+      
+      const file = fs.createWriteStream(filePath);
+      
+      https.get(url, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          // 处理重定向
+          return this.downloadFile(response.headers.location, filePath)
+            .then(resolve)
+            .catch(reject);
+        }
+        
+        if (response.statusCode !== 200) {
+          const errorMsg = `下载失败，状态码: ${response.statusCode}`;
+          this.sendLogToGUI(errorMsg, 'error');
+          reject(new Error(errorMsg));
+          return;
+        }
+        
+        const totalSize = parseInt(response.headers['content-length'], 10);
+        let downloadedSize = 0;
+        let lastProgressReport = 0;
+        
+        response.on('data', (chunk) => {
+          downloadedSize += chunk.length;
+          if (totalSize) {
+            const progress = ((downloadedSize / totalSize) * 100).toFixed(2);
+            // 每10%报告一次进度，避免日志过多
+            if (progress - lastProgressReport >= 10) {
+              const progressMsg = `EMQX 下载进度: ${progress}%`;
+              console.log(progressMsg);
+              this.sendLogToGUI(progressMsg, 'info');
+              lastProgressReport = Math.floor(progress / 10) * 10;
+            }
+          }
+        });
+        
+        response.pipe(file);
+        
+        file.on('finish', () => {
+          file.close();
+          const completeMsg = 'EMQX 服务下载完成';
+          console.log(completeMsg);
+          this.sendLogToGUI(completeMsg, 'success');
+          resolve();
+        });
+        
+        file.on('error', (err) => {
+          fs.unlink(filePath, () => {}); // 删除不完整的文件
+          this.sendLogToGUI(`下载文件时发生错误: ${err.message}`, 'error');
+          reject(err);
+        });
+      }).on('error', (err) => {
+        this.sendLogToGUI(`网络请求错误: ${err.message}`, 'error');
+        reject(err);
+      });
+    });
+  }
+
+  /**
+   * 解压EMQX服务
+   * @returns {Promise<void>}
+   */
+  async extractEmqx() {
+    try {
+      const extractMsg = `开始解压 EMQX 服务到: ${this.emqxWorkDir}`;
+      console.log(extractMsg);
+      this.sendLogToGUI(extractMsg, 'info');
+      
+      // 确保目标目录存在
+      if (!fs.existsSync(this.toolsDir)) {
+        fs.mkdirSync(this.toolsDir, { recursive: true });
+      }
+      
+      // 如果目标目录已存在，先删除
+      if (fs.existsSync(this.emqxWorkDir)) {
+        this.sendLogToGUI('清理现有 EMQX 目录', 'info');
+        fs.rmSync(this.emqxWorkDir, { recursive: true, force: true });
+      }
+      
+      const zip = new AdmZip(this.emqxZipPath);
+      
+      // 获取zip文件中的条目
+      const zipEntries = zip.getEntries();
+      if (zipEntries.length === 0) {
+        throw new Error('ZIP文件为空');
+      }
+      
+      // 找到根目录名称（通常是emqx-x.x.x-windows-amd64）
+      const rootEntry = zipEntries[0];
+      const rootDirName = rootEntry.entryName.split('/')[0];
+      
+      
+      this.sendLogToGUI('正在解压文件...', 'info');
+      zip.extractAllTo(this.emqxWorkDir, true);
+      
+      // 删除zip文件
+      if (fs.existsSync(this.emqxZipPath)) {
+        fs.unlinkSync(this.emqxZipPath);
+        this.sendLogToGUI('清理下载的ZIP文件', 'info');
+      }
+      
+      const completeMsg = 'EMQX 服务解压完成';
+      console.log(completeMsg);
+      this.sendLogToGUI(completeMsg, 'success');
+    } catch (error) {
+      const errorMsg = `解压 EMQX 服务失败: ${error.message}`;
+      console.error(errorMsg);
+      this.sendLogToGUI(errorMsg, 'error');
+      throw error;
+    }
+  }
+
+  /**
+   * 下载并安装EMQX服务
+   * @returns {Promise<Object>} 安装结果
+   */
+  async downloadAndInstallEmqx() {
+    try {
+      const startMsg = '检测到 EMQX 服务未安装，开始下载和安装...';
+      console.log(startMsg);
+      this.sendLogToGUI(startMsg, 'info');
+      
+      // 确保tools目录存在
+      if (!fs.existsSync(this.toolsDir)) {
+        fs.mkdirSync(this.toolsDir, { recursive: true });
+      }
+      
+      // 下载EMQX
+      await this.downloadFile(this.downloadUrl, this.emqxZipPath);
+      
+      // 解压EMQX
+      await this.extractEmqx();
+      
+      // 验证安装
+      this.sendLogToGUI('验证 EMQX 安装...', 'info');
+      if (!this.isEmqxInstalled()) {
+        throw new Error('EMQX 服务安装验证失败');
+      }
+      
+      const successMsg = 'EMQX 服务安装成功';
+      console.log(successMsg);
+      this.sendLogToGUI(successMsg, 'success');
+      return {
+        success: true,
+        message: 'EMQX 服务下载和安装成功'
+      };
+    } catch (error) {
+      const errorMsg = `下载和安装 EMQX 服务失败: ${error.message}`;
+      console.error(errorMsg);
+      this.sendLogToGUI(errorMsg, 'error');
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   /**
@@ -24,6 +230,18 @@ class EMQXService {
    */
   async startBroker() {
     try {
+      // 检查EMQX是否已安装
+      if (!this.isEmqxInstalled()) {
+        console.log('EMQX 服务未安装，开始下载和安装...');
+        const installResult = await this.downloadAndInstallEmqx();
+        if (!installResult.success) {
+          return {
+            success: false,
+            error: `安装 EMQX 服务失败: ${installResult.error}`
+          };
+        }
+      }
+      
       console.log('Starting EMQX broker at:', this.emqxPath);
       
       // 启动emqx
@@ -42,7 +260,7 @@ class EMQXService {
         });
         
         emqxProcess.stderr.on('data', (data) => {
-          errorOutput += data.toString();
+          output += data.toString();
         });
         
         emqxProcess.on('close', async (code) => {
