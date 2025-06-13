@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { gameplayService } from '@/services/gameplayService'
 
 export const useGameStore = defineStore('game', {
   state: () => ({
@@ -10,6 +11,7 @@ export const useGameStore = defineStore('game', {
       { id: 'strategy', name: '策略游戏', icon: '🎯' },
       { id: 'educational', name: '教育游戏', icon: '📚' },
       { id: 'multiplayer', name: '多人游戏', icon: '👥' },
+      { id: 'external', name: '外部玩法', icon: '📁' },
       { id: 'other', name: '其他', icon: '🎮' }
     ],
     gameStatus: {
@@ -18,7 +20,11 @@ export const useGameStore = defineStore('game', {
       'paused': '暂停',
       'finished': '已结束',
       'error': '错误'
-    }
+    },
+    // 外部玩法相关
+    gameplayService: gameplayService,
+    loadedGameplays: [],
+    currentGameplayConfig: null
   }),
 
   getters: {
@@ -116,7 +122,7 @@ export const useGameStore = defineStore('game', {
         name: gameData.name,
         description: gameData.description || '',
         category: gameData.category || 'other',
-        status: 'idle',
+        status: gameData.status || 'stopped',
         players: gameData.players || 1,
         difficulty: gameData.difficulty || 'medium',
         createdAt: Date.now(),
@@ -200,7 +206,7 @@ export const useGameStore = defineStore('game', {
     stopGame(gameId) {
       const game = this.getGameById(gameId)
       if (game) {
-        game.status = 'idle'
+        game.status = 'stopped'
         this.saveGames()
         
         if (this.selectedGameId === gameId) {
@@ -232,6 +238,195 @@ export const useGameStore = defineStore('game', {
           ...category,
           count: this.getGamesByCategory(category.id).length
         }))
+      }
+    },
+
+    // === 外部玩法相关方法 ===
+    
+    /**
+     * 加载外部玩法文件
+     * @param {string} filePath - 玩法文件路径
+     */
+    async loadExternalGameplay(filePath) {
+      try {
+        console.log('正在加载外部玩法:', filePath)
+        const config = await this.gameplayService.loadGameplayFromJS(filePath)
+        this.currentGameplayConfig = config
+        // 保存到 sessionStorage 以防热更新时丢失
+        sessionStorage.setItem('currentGameplayConfig', JSON.stringify(config))
+        
+        // 检查是否已经存在同名游戏
+        const existingGame = this.games.find(game => 
+          game.type === 'external_gameplay' && game.name === config.title
+        )
+        
+        if (existingGame) {
+          // 更新现有游戏
+          this.updateGame(existingGame.id, {
+            description: config.description,
+            configPath: filePath,
+            requiredDevices: config.requiredDevices,
+            version: config.version,
+            author: config.author
+          })
+          console.log('已更新现有外部玩法:', config.title)
+        } else {
+          // 添加新游戏
+          const gameData = {
+            name: config.title,
+            description: config.description,
+            category: 'external',
+            type: 'external_gameplay',
+            status: 'stopped',
+            configPath: filePath,
+            requiredDevices: config.requiredDevices,
+            version: config.version || '1.0.0',
+            author: config.author || '未知作者'
+          }
+          
+          this.addGame(gameData)
+          console.log('已添加新外部玩法:', config.title)
+        }
+        
+        return config
+      } catch (error) {
+        console.error('加载外部玩法失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 启动外部玩法配置
+     * @param {string} filePath - 玩法文件路径
+     */
+    async startExternalGameplayConfig(filePath) {
+      try {
+        const gameplay = await gameplayService.loadGameplayFromJS(filePath)
+        this.currentGameplayConfig = {
+          title: gameplay.title || gameplay.name || '外部玩法',
+          description: gameplay.description || '外部玩法配置',
+          requiredDevices: gameplay.requiredDevices || [],
+          parameters: gameplay.parameters || {},
+          gameplay,
+          filePath
+        }
+        // 保存到 sessionStorage 以防热更新时丢失
+        sessionStorage.setItem('currentGameplayConfig', JSON.stringify(this.currentGameplayConfig))
+        return this.currentGameplayConfig
+      } catch (error) {
+        console.error('加载外部玩法配置失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 启动外部玩法（配置完成后）
+     * @param {Object} deviceMapping - 设备映射
+     * @param {Object} parameters - 参数
+     */
+    async startExternalGameplay(deviceMapping, parameters) {
+      try {
+        if (!this.currentGameplayConfig) {
+          throw new Error('没有准备好的玩法配置')
+        }
+        
+        // 应用设备映射和参数
+        this.gameplayService.applyDeviceMapping(deviceMapping)
+        this.gameplayService.applyParameters(parameters)
+        
+        // 启动玩法
+        await this.gameplayService.startGameplay()
+        
+        // 更新游戏状态
+        this.startGame(this.currentGameplayConfig.gameId)
+        
+        console.log('外部玩法启动成功:', this.currentGameplayConfig.config.title)
+      } catch (error) {
+        console.error('启动外部玩法失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 暂停外部玩法
+     * @param {string} gameId - 游戏ID
+     */
+    async pauseExternalGameplay(gameId) {
+      const game = this.getGameById(gameId)
+      if (game && game.type === 'external_gameplay') {
+        try {
+          await this.gameplayService.pauseGameplay()
+          this.pauseGame(gameId)
+          console.log('外部玩法已暂停:', game.name)
+        } catch (error) {
+          console.error('暂停外部玩法失败:', error)
+          throw error
+        }
+      }
+    },
+    
+    /**
+     * 恢复外部玩法
+     * @param {string} gameId - 游戏ID
+     */
+    async resumeExternalGameplay(gameId) {
+      const game = this.getGameById(gameId)
+      if (game && game.type === 'external_gameplay') {
+        try {
+          await this.gameplayService.resumeGameplay()
+          this.resumeGame(gameId)
+          console.log('外部玩法已恢复:', game.name)
+        } catch (error) {
+          console.error('恢复外部玩法失败:', error)
+          throw error
+        }
+      }
+    },
+    
+    /**
+     * 停止外部玩法
+     * @param {string} gameId - 游戏ID
+     */
+    async stopExternalGameplay(gameId) {
+      const game = this.getGameById(gameId)
+      if (game && game.type === 'external_gameplay') {
+        try {
+          await this.gameplayService.endGameplay()
+          this.stopGame(gameId)
+          console.log('外部玩法已停止:', game.name)
+        } catch (error) {
+          console.error('停止外部玩法失败:', error)
+          // 即使停止失败，也要重置游戏状态
+          this.stopGame(gameId)
+          throw error
+        }
+      }
+    },
+    
+    /**
+     * 获取外部玩法状态
+     */
+    getExternalGameplayStatus() {
+      return this.gameplayService.getGameplayStatus()
+    },
+    
+    /**
+     * 检查外部玩法的设备依赖
+     * @param {string} gameId - 游戏ID
+     */
+    checkExternalGameplayDevices(gameId) {
+      const game = this.getGameById(gameId)
+      if (!game || game.type !== 'external_gameplay' || !game.requiredDevices) {
+        return { valid: false, missing: [], optional: [] }
+      }
+      
+      // 这里需要导入deviceStore来检查设备
+      // 为了避免循环依赖，我们返回设备需求信息，让UI层处理
+      return {
+        valid: true,
+        required: game.requiredDevices.filter(d => d.required),
+        optional: game.requiredDevices.filter(d => !d.required),
+        all: game.requiredDevices
       }
     }
   }

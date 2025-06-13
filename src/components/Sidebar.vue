@@ -23,7 +23,7 @@
         </router-link>
       </li>
       <li>
-        <router-link to="/game-list" class="nav-link" :class="{ active: $route.path === '/game-list' }">
+        <router-link to="/games" class="nav-link" :class="{ active: $route.path === '/games' }">
           玩法列表
         </router-link>
       </li>

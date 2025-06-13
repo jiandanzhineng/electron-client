@@ -200,6 +200,20 @@ class IPCHandlers {
         return null;
       }
     });
+
+    // 读取文件内容
+    ipcMain.handle('read-file', async (event, filePath) => {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        return { success: true, content };
+      } catch (error) {
+        console.error('读取文件失败:', error);
+        return { success: false, error: error.message };
+      }
+    });
   }
 
   // 清理资源

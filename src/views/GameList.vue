@@ -24,6 +24,9 @@
         <button @click="refreshGames" class="btn btn-secondary">
           🔄 刷新
         </button>
+        <button @click="showLoadGameplayDialog" class="btn btn-success">
+          📁 加载外部玩法
+        </button>
       </div>
     </div>
 
@@ -152,6 +155,55 @@
       </div>
     </div>
 
+    <!-- 加载外部玩法模态框 -->
+    <div v-if="showLoadGameplayModal" class="modal-overlay" @click="cancelLoadGameplay">
+      <div class="modal" @click.stop>
+        <div class="modal-header">
+          <h2>加载外部玩法</h2>
+          <button @click="cancelLoadGameplay" class="modal-close">✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="form-group">
+            <label>选择玩法文件 *</label>
+            <div class="file-input-container">
+              <input 
+                ref="gameplayFileInput"
+                type="file" 
+                accept=".js"
+                @change="handleFileSelect"
+                style="display: none;"
+              >
+              <div class="file-display">
+                <span v-if="selectedGameplayFile">{{ selectedGameplayFile.name }}</span>
+                <span v-else class="placeholder">未选择文件</span>
+              </div>
+              <button type="button" @click="selectGameplayFile" class="btn btn-secondary">
+                📁 选择文件
+              </button>
+            </div>
+            <div class="file-hint">
+              请选择位于 /e:/develop/electron-client/outter-game/ 目录中的 JavaScript 玩法文件
+            </div>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" @click="cancelLoadGameplay" class="btn btn-secondary">
+              取消
+            </button>
+            <button 
+              type="button" 
+              @click="loadExternalGameplay" 
+              class="btn btn-primary"
+              :disabled="!selectedGameplayFile || isLoadingGameplay"
+            >
+              {{ isLoadingGameplay ? '加载中...' : '加载玩法' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 添加/编辑游戏模态框 -->
     <div v-if="showAddGameModal || editingGame" class="modal-overlay" @click="closeModal">
       <div class="modal" @click.stop>
@@ -240,14 +292,22 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGameStore } from '../stores/gameStore'
 
+const router = useRouter()
 const gameStore = useGameStore()
 const searchQuery = ref('')
 const selectedCategory = ref('')
 const showAddGameModal = ref(false)
 const editingGame = ref(null)
 const newCategory = ref('')
+
+// 外部玩法加载相关
+const showLoadGameplayModal = ref(false)
+const selectedGameplayFile = ref(null)
+const gameplayFileInput = ref(null)
+const isLoadingGameplay = ref(false)
 
 const gameForm = ref({
   name: '',
@@ -286,20 +346,55 @@ function selectGame(game) {
   gameStore.selectGame(game.id)
 }
 
-function startGame(game) {
-  gameStore.startGame(game.id)
+async function startGame(game) {
+  try {
+    if (game.type === 'external_gameplay') {
+      // 进入配置页面
+      await gameStore.startExternalGameplayConfig(game.configPath || game.path)
+      router.push('/gameplay-config')
+    } else {
+      gameStore.startGame(game.id)
+    }
+  } catch (error) {
+    console.error('启动游戏失败:', error)
+    alert(`启动失败: ${error.message}`)
+  }
 }
 
-function pauseGame(game) {
-  gameStore.pauseGame(game.id)
+async function pauseGame(game) {
+  try {
+    if (game.type === 'external_gameplay') {
+      await gameStore.pauseExternalGameplay(game.id)
+    } else {
+      gameStore.pauseGame(game.id)
+    }
+  } catch (error) {
+    alert(`暂停失败: ${error.message}`)
+  }
 }
 
-function resumeGame(game) {
-  gameStore.resumeGame(game.id)
+async function resumeGame(game) {
+  try {
+    if (game.type === 'external_gameplay') {
+      await gameStore.resumeExternalGameplay(game.id)
+    } else {
+      gameStore.resumeGame(game.id)
+    }
+  } catch (error) {
+    alert(`恢复失败: ${error.message}`)
+  }
 }
 
-function stopGame(game) {
-  gameStore.stopGame(game.id)
+async function stopGame(game) {
+  try {
+    if (game.type === 'external_gameplay') {
+      await gameStore.stopExternalGameplay(game.id)
+    } else {
+      gameStore.stopGame(game.id)
+    }
+  } catch (error) {
+    alert(`停止失败: ${error.message}`)
+  }
 }
 
 function editGame(game) {
@@ -395,6 +490,63 @@ function getAveragePlayTime() {
   const avgTime = Math.round(totalTime / games.length)
   
   return formatPlayTime(avgTime)
+}
+
+// === 外部玩法加载相关方法 ===
+
+function showLoadGameplayDialog() {
+  showLoadGameplayModal.value = true
+  selectedGameplayFile.value = null
+}
+
+function selectGameplayFile() {
+  gameplayFileInput.value?.click()
+}
+
+function handleFileSelect(event) {
+  const file = event.target.files[0]
+  if (file) {
+    if (!file.name.endsWith('.js')) {
+      alert('请选择JavaScript文件（.js）')
+      return
+    }
+    selectedGameplayFile.value = file
+  }
+}
+
+async function loadExternalGameplay() {
+  if (!selectedGameplayFile.value) {
+    alert('请先选择玩法文件')
+    return
+  }
+  
+  isLoadingGameplay.value = true
+  
+  try {
+    // 构建文件路径（假设文件在outter-game目录中）
+    const filePath = `e:/develop/electron-client/outter-game/${selectedGameplayFile.value.name}`
+    
+    // 加载外部玩法
+    const config = await gameStore.loadExternalGameplay(filePath)
+    
+    alert(`外部玩法 "${config.title}" 加载成功！`)
+    showLoadGameplayModal.value = false
+    selectedGameplayFile.value = null
+    
+    // 刷新游戏列表
+    refreshGames()
+    
+  } catch (error) {
+    console.error('加载外部玩法失败:', error)
+    alert(`加载失败: ${error.message}`)
+  } finally {
+    isLoadingGameplay.value = false
+  }
+}
+
+function cancelLoadGameplay() {
+  showLoadGameplayModal.value = false
+  selectedGameplayFile.value = null
 }
 </script>
 
@@ -816,6 +968,36 @@ function getAveragePlayTime() {
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+/* 文件选择样式 */
+.file-input-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.file-display {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.file-display .placeholder {
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.file-hint {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 5px;
+  line-height: 1.4;
 }
 
 /* 响应式设计 */

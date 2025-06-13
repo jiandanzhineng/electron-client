@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restartMqttBroker: () => ipcRenderer.invoke('restart-mqtt-broker'),
   checkMqttBrokerStatus: () => ipcRenderer.invoke('check-mqtt-broker-status'),
   
+  // 通用IPC调用方法
+  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+  
   // Expose IPC methods for system information
   getSystemUptime: () => ipcRenderer.invoke('get-system-uptime'),
   getSystemInfo: () => ipcRenderer.invoke('get-system-info')

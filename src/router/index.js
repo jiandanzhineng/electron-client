@@ -4,6 +4,8 @@ import ServerStatus from '../views/ServerStatus.vue'
 import LocalServer from '../views/LocalServer.vue'
 import DeviceManagement from '../views/DeviceManagement.vue'
 import GameList from '../views/GameList.vue'
+import GameplayConfig from '../views/GameplayConfig.vue'
+import GameplayRunning from '../views/GameplayRunning.vue'
 
 const routes = [
   {
@@ -27,10 +29,20 @@ const routes = [
     component: DeviceManagement
   },
   {
-    path: '/game-list',
+    path: '/games',
     name: 'GameList',
     component: GameList
-  }
+  },
+  {
+     path: '/gameplay-config',
+     name: 'GameplayConfig',
+     component: GameplayConfig
+   },
+   {
+     path: '/gameplay-running',
+     name: 'GameplayRunning',
+     component: GameplayRunning
+   }
 ]
 
 const router = createRouter({

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "cross-env NODE_ENV=development electron .",
+    "dev:electron": "cross-env NODE_ENV=development nodemon --exec electron . --watch main.js --watch preload.js --watch services/ --watch util/ --ignore node_modules/",
     "build": "vite build",
     "build:electron": "electron-builder",
     "dist": "npm run build && electron-builder --publish=never",
@@ -25,12 +25,14 @@
     "electron": "^36.2.1",
     "electron-builder": "^24.13.3",
     "electron-reloader": "^1.2.3",
+    "nodemon": "^3.0.2",
     "wait-on": "^8.0.3"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^4.6.2",
     "adm-zip": "^0.5.10",
     "bonjour-service": "^1.3.0",
+    "element-plus": "^2.10.1",
     "mqtt": "^5.13.0",
     "pinia": "^2.3.1",
     "vite": "^5.4.19",
@@ -55,7 +57,9 @@
       {
         "from": "inner-tools",
         "to": "inner-tools",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

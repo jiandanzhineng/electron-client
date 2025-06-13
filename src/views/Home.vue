@@ -51,7 +51,7 @@
         <button @click="$router.push('/local-server')" class="action-btn">
           🖥️ 启动服务
         </button>
-        <button @click="$router.push('/game-list')" class="action-btn">
+        <button @click="$router.push('/games')" class="action-btn">
           🎮 游戏列表
         </button>
         <button @click="$router.push('/server-status')" class="action-btn">
