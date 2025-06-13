@@ -267,6 +267,89 @@ export const useServiceStore = defineStore('service', {
       }
     },
 
+    // 处理设备上报消息
+    async handleDeviceReport(message) {
+      try {
+        // 检查是否是dpub topic格式: /dpub/XXXX (任意设备标识)
+        const topicMatch = message.topic.match(/^\/dpub\/(.+)$/)
+        if (!topicMatch) {
+          return // 不是设备上报topic，忽略
+        }
+        
+        const deviceId = topicMatch[1]
+        
+        // 解析消息内容
+        let payload
+        try {
+          payload = JSON.parse(message.payload)
+        } catch (e) {
+          console.error('解析MQTT消息失败:', e)
+          return
+        }
+        
+        // 检查是否是report方法
+        if (payload.method !== 'report') {
+          return // 不是上报消息，忽略
+        }
+        
+        // 导入设备store
+        const { useDeviceStore } = await import('./deviceStore')
+        const deviceStore = useDeviceStore()
+        
+        // 检查设备是否已存在
+         let device = deviceStore.getDeviceById(deviceId)
+         
+         if (!device) {
+           // 设备不存在，自动添加
+           const deviceTypeMap = {
+             'ZIDONGSUO': '自动锁',
+             'QTZ': 'QTZ设备',
+             'TD01': 'TD01设备',
+             'DIANJI': '电机设备'
+           }
+           
+           const deviceData = {
+              id: deviceId,
+              name: `${deviceTypeMap[payload.device_type] || payload.device_type}-${deviceId.slice(-4)}`,
+              type: payload.device_type || 'other'
+            }
+           
+           deviceStore.addDevice(deviceData)
+           this.addServerLog(`自动添加设备: ${deviceData.name} (${deviceId})`)
+         }
+         
+         // 更新设备数据 - 除了method之外的所有属性都作为设备属性
+         const updateData = { ...payload }
+         delete updateData.method // 移除method字段
+         
+         deviceStore.updateDeviceData(deviceId, updateData)
+        
+      } catch (error) {
+        console.error('处理设备上报消息失败:', error)
+        this.addServerLog(`处理设备上报消息失败: ${error.message}`)
+      }
+    },
+
+    // 发布MQTT消息
+    async publishMessage(topic, payload) {
+      try {
+        if (!this.mqttConnected) {
+          throw new Error('MQTT未连接')
+        }
+        
+        const result = await window.electronAPI.publishMqttMessage(topic, payload)
+        if (result.success) {
+          this.addServerLog(`MQTT发布成功: ${topic} - ${payload}`)
+          return true
+        } else {
+          throw new Error(result.error || '发布失败')
+        }
+      } catch (error) {
+        this.addServerLog(`MQTT发布失败: ${error.message}`)
+        throw error
+      }
+    },
+
     // 初始化服务状态监听器
     init() {
       if (window.electronAPI) {
@@ -297,6 +380,9 @@ export const useServiceStore = defineStore('service', {
         // 监听MQTT消息
         window.electronAPI.onMqttMessage((message) => {
           this.addServerLog(`MQTT消息: ${message.topic} - ${message.payload}`)
+          
+          // 处理设备上报消息
+          this.handleDeviceReport(message)
         })
       }
     }

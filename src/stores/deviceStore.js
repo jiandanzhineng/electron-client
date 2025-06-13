@@ -12,6 +12,9 @@ export const useDeviceStore = defineStore('device', {
       'sensor': '传感器',
       'camera': '摄像头',
       'QTZ': 'QTZ设备',
+      'ZIDONGSUO': '自动锁',
+      'TD01': 'TD01设备',
+      'DIANJI': '电机设备',
       'other': '其他'
     }
   }),
@@ -122,14 +125,13 @@ export const useDeviceStore = defineStore('device', {
       }
     },
 
-    // 标记设备离线
+    // 标记设备离线并删除设备（1分钟未收到消息则删除）
     markDeviceOffline(deviceId) {
       const device = this.getDeviceById(deviceId)
-      if (device && device.connected) {
-        device.connected = false
-        this.deviceTimeouts.delete(deviceId)
-        this.saveDevices()
-        this.updateDeviceTable()
+      if (device) {
+        // 1分钟未收到消息则删除设备
+        this.removeDevice(deviceId)
+        console.log(`设备 ${deviceId} 超过1分钟未上报，已自动删除`)
       }
     },
 

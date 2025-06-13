@@ -100,11 +100,38 @@
             </div>
             
             <div v-if="selectedDevice.data && Object.keys(selectedDevice.data).length > 0" class="device-data">
-              <h4>设备数据</h4>
+              <div class="device-data-header">
+                <h4>设备数据</h4>
+                <div class="data-actions">
+                  <button v-if="!isEditing" @click="startEdit" class="btn btn-secondary btn-sm">
+                    编辑
+                  </button>
+                  <div v-else class="edit-actions">
+                    <button @click="saveChanges" class="btn btn-primary btn-sm">
+                      保存
+                    </button>
+                    <button @click="cancelEdit" class="btn btn-secondary btn-sm">
+                      取消
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div class="data-grid">
                 <div v-for="(value, key) in selectedDevice.data" :key="key" class="data-item">
                   <label>{{ key }}:</label>
-                  <span>{{ value }}</span>
+                  <span v-if="!isEditing">{{ value }}</span>
+                  <input 
+                    v-else-if="getInputType(value) === 'checkbox'" 
+                    v-model="editData[key]" 
+                    type="checkbox"
+                    class="data-checkbox"
+                  >
+                  <input 
+                    v-else 
+                    v-model="editData[key]" 
+                    :type="getInputType(value)"
+                    class="data-input"
+                  >
                 </div>
               </div>
             </div>
@@ -172,8 +199,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useDeviceStore } from '../stores/deviceStore'
+import { useServiceStore } from '../stores/serviceStore'
 
 const deviceStore = useDeviceStore()
+const serviceStore = useServiceStore()
 
 const showAddModal = ref(false)
 const newDevice = ref({
@@ -182,12 +211,18 @@ const newDevice = ref({
   type: ''
 })
 
+// 编辑相关状态
+const isEditing = ref(false)
+const editData = ref({})
+const originalData = ref({})
+
 const selectedDevice = computed(() => {
   return deviceStore.selectedDeviceId ? deviceStore.getDeviceById(deviceStore.selectedDeviceId) : null
 })
 
 onMounted(() => {
   deviceStore.initDeviceList()
+  serviceStore.init() // 初始化服务监听器，包括MQTT消息处理
 })
 
 function selectDevice(deviceId) {
@@ -240,6 +275,81 @@ function formatLastReport(timestamp) {
     return `${Math.floor(diff / 3600000)}小时前`
   } else {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
+  }
+}
+
+// 编辑相关方法
+function startEdit() {
+  if (!selectedDevice.value || !selectedDevice.value.data) return
+  
+  isEditing.value = true
+  // 深拷贝当前数据
+  originalData.value = JSON.parse(JSON.stringify(selectedDevice.value.data))
+  editData.value = JSON.parse(JSON.stringify(selectedDevice.value.data))
+}
+
+function cancelEdit() {
+  isEditing.value = false
+  editData.value = {}
+  originalData.value = {}
+}
+
+async function saveChanges() {
+  if (!selectedDevice.value) return
+  
+  try {
+    // 构建下发数据
+    const updateData = {
+      method: 'update'
+    }
+    
+    // 只包含修改过的属性
+    for (const key in editData.value) {
+      if (editData.value[key] !== originalData.value[key]) {
+        // 保持原始数据类型
+        const originalValue = originalData.value[key]
+        let newValue = editData.value[key]
+        
+        if (typeof originalValue === 'number') {
+          newValue = Number(newValue)
+        } else if (typeof originalValue === 'boolean') {
+          newValue = newValue === 'true' || newValue === true
+        }
+        
+        updateData[key] = newValue
+      }
+    }
+    
+    // 如果没有修改，直接取消编辑
+    if (Object.keys(updateData).length === 1) {
+      cancelEdit()
+      return
+    }
+    
+    // 下发到设备
+    const topic = `/drecv/${selectedDevice.value.id}`
+    await serviceStore.publishMessage(topic, JSON.stringify(updateData))
+    
+    // 更新本地设备数据
+    deviceStore.updateDeviceData(selectedDevice.value.id, editData.value)
+    
+    // 退出编辑模式
+    cancelEdit()
+    
+    console.log('设备数据更新成功')
+  } catch (error) {
+    console.error('保存设备数据失败:', error)
+    alert('保存失败，请重试')
+  }
+}
+
+function getInputType(value) {
+  if (typeof value === 'number') {
+    return 'number'
+  } else if (typeof value === 'boolean') {
+    return 'checkbox'
+  } else {
+    return 'text'
   }
 }
 </script>
@@ -489,6 +599,74 @@ function formatLastReport(timestamp) {
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+/* 设备数据编辑样式 */
+.device-data-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.device-data-header h4 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.data-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.data-input {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 0.2s ease;
+}
+
+.data-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.data-checkbox {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.data-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.data-item:last-child {
+  border-bottom: none;
+}
+
+.data-item label {
+  font-weight: 500;
+  color: #555;
+  min-width: 100px;
+}
+
+.data-item span {
+  color: #333;
+  flex: 1;
+  text-align: right;
 }
 
 /* 模态框样式 */

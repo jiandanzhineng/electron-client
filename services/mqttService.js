@@ -39,7 +39,7 @@ class MQTTService {
         // 生成三位随机数
         const randomNumber = Math.floor(100 + Math.random() * 900);
         const topic = `/dpub/electron${randomNumber}`;
-        const message = 'electron start';
+        const message = '{ "electron": "start" }';
         
         // 发布消息
         this.client.publish(topic, message, (err) => {

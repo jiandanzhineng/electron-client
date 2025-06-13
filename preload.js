@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMqttStatus: (callback) => ipcRenderer.on('mqtt-status', (event, status) => callback(status)),
   onMqttMessage: (callback) => ipcRenderer.on('mqtt-message', (event, message) => callback(message)),
   sendMqttMessage: (topic, payload) => ipcRenderer.send('mqtt-send-message', topic, payload),
+  publishMqttMessage: (topic, payload) => ipcRenderer.invoke('publish-mqtt-message', topic, payload),
   
   // Expose IPC methods for mDNS publishing
   publishMDNS: (port) => ipcRenderer.invoke('publish-mdns', port),

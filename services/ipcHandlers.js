@@ -79,6 +79,17 @@ class IPCHandlers {
     ipcMain.on('mqtt-send-message', (event, topic, payload) => {
       mqttService.sendMessage(topic, payload);
     });
+
+    // MQTT消息发布处理 (新的统一接口)
+    ipcMain.handle('publish-mqtt-message', async (event, topic, payload) => {
+      try {
+        mqttService.sendMessage(topic, payload);
+        return { success: true };
+      } catch (error) {
+        console.error('MQTT消息发布失败:', error);
+        return { success: false, error: error.message };
+      }
+    });
   }
 
   // mDNS相关处理器
