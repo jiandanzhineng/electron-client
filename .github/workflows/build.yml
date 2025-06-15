@@ -30,19 +30,17 @@ jobs:
         npm install
       shell: powershell
       
-    - name: Build application
+    - name: Build and publish application
       run: npm run dist
-      
-    - name: Create zip archive
-      run: |
-        cd dist
-        Compress-Archive -Path win-unpacked -DestinationPath easysmart-electron-win.zip
-      shell: powershell
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: ./dist/easysmart-electron-win.zip
+        files: |
+          ./dist/*.exe
+          ./dist/*.blockmap
         name: Release ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
         draft: false

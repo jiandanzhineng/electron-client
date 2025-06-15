@@ -8,6 +8,8 @@ const mqttService = require('./mqttService');
 const mdnsService = require('./mdnsService');
 const localServerService = require('./localServerService');
 const emqxService = require('./emqxService');
+const autoUpdateService = require('./autoUpdateService');
+const logger = require('./logService');
 
 class IPCHandlers {
   constructor() {
@@ -28,6 +30,7 @@ class IPCHandlers {
     this.setupMDNSHandlers();
     this.setupLocalServerHandlers();
     this.setupSystemHandlers();
+    this.setupAutoUpdateHandlers();
   }
 
   // 键盘事件处理器
@@ -59,7 +62,7 @@ class IPCHandlers {
         mqttService.connect(url, options);
         return { success: true };
       } catch (error) {
-        console.error('MQTT连接失败:', error);
+        logger.error('MQTT连接失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });
@@ -70,7 +73,7 @@ class IPCHandlers {
         mqttService.disconnect();
         return { success: true };
       } catch (error) {
-        console.error('MQTT断开连接失败:', error);
+        logger.error('MQTT断开连接失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });
@@ -86,7 +89,7 @@ class IPCHandlers {
         mqttService.sendMessage(topic, payload);
         return { success: true };
       } catch (error) {
-        console.error('MQTT消息发布失败:', error);
+        logger.error('MQTT消息发布失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });
@@ -178,7 +181,7 @@ class IPCHandlers {
           formatted: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
         };
       } catch (error) {
-        console.error('Error getting system uptime:', error);
+        logger.error('Error getting system uptime', 'ipc', error);
         return { uptime: 0, formatted: '00:00:00' };
       }
     });
@@ -196,7 +199,7 @@ class IPCHandlers {
           uptime: os.uptime()
         };
       } catch (error) {
-        console.error('Error getting system info:', error);
+        logger.error('Error getting system info', 'ipc', error);
         return null;
       }
     });
@@ -210,7 +213,99 @@ class IPCHandlers {
         const content = await fs.readFile(filePath, 'utf8');
         return { success: true, content };
       } catch (error) {
-        console.error('读取文件失败:', error);
+        logger.error('读取文件失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取应用日志
+    ipcMain.handle('get-app-logs', async (event, lines = 100) => {
+      try {
+        const logs = logger.getRecentLogs(lines);
+        return {
+          success: true,
+          logs,
+          logFile: logger.getLogFilePath(),
+          logDirectory: logger.getLogDirectory()
+        };
+      } catch (error) {
+        logger.error('获取应用日志失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 清理旧日志
+    ipcMain.handle('clean-old-logs', async (event) => {
+      try {
+        logger.cleanOldLogs();
+        return { success: true };
+      } catch (error) {
+        logger.error('清理旧日志失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 打开日志目录
+    ipcMain.handle('open-log-directory', async (event) => {
+      try {
+        const { shell } = require('electron');
+        const fs = require('fs');
+        const logDir = logger.getLogDirectory();
+        if (logDir && fs.existsSync(logDir)) {
+          shell.openPath(logDir);
+          return { success: true };
+        } else {
+          return { success: false, error: '日志目录不存在' };
+        }
+      } catch (error) {
+        logger.error('打开日志目录失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }
+
+  // 自动更新相关处理器
+  setupAutoUpdateHandlers() {
+    // 手动检查更新
+    ipcMain.handle('check-for-updates', async (event) => {
+      try {
+        autoUpdateService.checkForUpdatesManually();
+        return { success: true };
+      } catch (error) {
+        logger.error('检查更新失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 下载更新
+    ipcMain.handle('download-update', async (event) => {
+      try {
+        autoUpdateService.downloadUpdate();
+        return { success: true };
+      } catch (error) {
+        logger.error('下载更新失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 安装更新并重启
+    ipcMain.handle('install-update', async (event) => {
+      try {
+        autoUpdateService.installUpdate();
+        return { success: true };
+      } catch (error) {
+        logger.error('安装更新失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取更新状态
+    ipcMain.handle('get-update-status', async (event) => {
+      try {
+        const status = autoUpdateService.getStatus();
+        return { success: true, data: status };
+      } catch (error) {
+        logger.error('获取更新状态失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });

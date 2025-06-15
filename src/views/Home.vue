@@ -201,6 +201,8 @@ onMounted(() => {
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
+
+
 .action-btn:active {
   transform: translateY(0);
 }

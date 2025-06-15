@@ -2,6 +2,7 @@
 
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const logger = require('./services/logService');
 
 // 引入 electron-reloader，忽略tools目录避免日志文件变化触发重载
 // 临时注释掉 electron-reloader 来调试启动问题
@@ -18,6 +19,7 @@ const ipcHandlers = require('./services/ipcHandlers');
 const mqttService = require('./services/mqttService');
 const mdnsService = require('./services/mdnsService');
 const localServerService = require('./services/localServerService');
+const autoUpdateService = require('./services/autoUpdateService');
 
 // 保持对window对象的全局引用，如果不这么做的话，当JavaScript对象被
 // 垃圾回收的时候，window对象将会自动的关闭
@@ -61,6 +63,14 @@ function createWindow() {
   // 初始化IPC处理器
   ipcHandlers.setMainWindow(mainWindow);
   ipcHandlers.initializeHandlers();
+  
+  // 初始化自动更新服务
+  autoUpdateService.setMainWindow(mainWindow);
+  
+  // 在应用启动后5秒检查更新（避免影响启动速度）
+  setTimeout(() => {
+    autoUpdateService.checkForUpdates();
+  }, 5000);
 }
 
 // 当Electron完成初始化并准备创建浏览器窗口时调用此方法
@@ -72,7 +82,7 @@ app.whenReady().then(createWindow);
 
 // 在应用退出时清理所有服务
 app.on('before-quit', () => {
-  console.log('Application is quitting, cleaning up services...');
+  logger.info('Application is quitting, cleaning up services...', 'main');
   ipcHandlers.cleanup();
 });
 

@@ -48,12 +48,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restartMqttBroker: () => ipcRenderer.invoke('restart-mqtt-broker'),
   checkMqttBrokerStatus: () => ipcRenderer.invoke('check-mqtt-broker-status'),
   
+  // 读取文件
+  readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
+  
+  // 日志相关API
+  getAppLogs: (lines) => ipcRenderer.invoke('get-app-logs', lines),
+  cleanOldLogs: () => ipcRenderer.invoke('clean-old-logs'),
+  openLogDirectory: () => ipcRenderer.invoke('open-log-directory'),
+  
   // 通用IPC调用方法
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
   
   // Expose IPC methods for system information
   getSystemUptime: () => ipcRenderer.invoke('get-system-uptime'),
-  getSystemInfo: () => ipcRenderer.invoke('get-system-info')
+  getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+  
+  // 自动更新相关API
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
+  onAutoUpdaterStatus: (callback) => ipcRenderer.on('auto-updater-status', (event, status) => callback(status))
 });
 
 console.log('Preload script executed');

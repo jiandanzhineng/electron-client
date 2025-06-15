@@ -16,7 +16,12 @@ const routes = [
   {
     path: '/server-status',
     name: 'ServerStatus',
-    component: ServerStatus
+    component: () => import('../views/ServerStatus.vue')
+  },
+  {
+    path: '/logs',
+    name: 'LogViewer',
+    component: () => import('../views/LogViewer.vue')
   },
   {
     path: '/local-server',
