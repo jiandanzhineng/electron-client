@@ -35,16 +35,16 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ./dist/*.exe
-          ./dist/*.blockmap
-          ./dist/latest.yml
-        name: Release ${{ github.ref_name }}
-        tag_name: ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # - name: Create Release
+    #   uses: softprops/action-gh-release@v1
+    #   with:
+    #     files: |
+    #       ./dist/*.exe
+    #       ./dist/*.blockmap
+    #       ./dist/latest.yml
+    #     name: Release ${{ github.ref_name }}
+    #     tag_name: ${{ github.ref_name }}
+    #     draft: false
+    #     prerelease: false
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
