@@ -8,7 +8,7 @@
     "dev:electron": "cross-env NODE_ENV=development nodemon --exec electron . --watch main.js --watch preload.js --watch services/ --watch util/ --ignore node_modules/",
     "build": "vite build",
     "build:electron": "electron-builder",
-    "dist": "npm run build && electron-builder --publish=onTagOrDraft",
+    "dist": "npm run build && electron-builder --win nsis --publish=onTagOrDraft",
     "dist:never": "npm run build && electron-builder --publish=never",
     "dist:installer": "npm run build && electron-builder --win nsis --publish=never",
     "dist:portable": "electron-builder --win portable --publish=never",
