@@ -45,7 +45,7 @@
   },
   "build": {
     "appId": "com.easysmart.electron",
-    "productName": "EasySmart Electron",
+    "productName": "EasySmart.Electron",
     "artifactName": "${productName}-Setup-${version}.${ext}",
     "directories": {
       "output": "dist"
