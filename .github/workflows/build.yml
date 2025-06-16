@@ -41,6 +41,7 @@ jobs:
         files: |
           ./dist/*.exe
           ./dist/*.blockmap
+          ./dist/latest.yml
         name: Release ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
         draft: false
