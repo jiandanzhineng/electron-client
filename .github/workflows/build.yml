@@ -34,3 +34,13 @@ jobs:
       run: npm run dist
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder
+      timeout-minutes: 30
+      
+    - name: Retry upload on failure
+      if: failure()
+      run: npm run dist
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder
+      timeout-minutes: 30
