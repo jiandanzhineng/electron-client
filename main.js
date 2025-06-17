@@ -30,6 +30,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 1000,
+    title: '简单智能控制台',
+    icon: path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: true,

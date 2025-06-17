@@ -17,6 +17,9 @@ const serviceStore = useServiceStore()
 let serverLogListener = null
 
 onMounted(() => {
+  // 初始化服务状态监听器
+  serviceStore.init()
+  
   // 监听服务器日志事件
   if (window.electronAPI && window.electronAPI.onServerLog) {
     serverLogListener = (logData) => {

@@ -262,6 +262,18 @@ class IPCHandlers {
         return { success: false, error: error.message };
       }
     });
+
+    // 打开外部浏览器
+    ipcMain.handle('open-external-url', async (event, url) => {
+      try {
+        const { shell } = require('electron');
+        await shell.openExternal(url);
+        return { success: true };
+      } catch (error) {
+        logger.error('打开外部链接失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
   }
 
   // 自动更新相关处理器

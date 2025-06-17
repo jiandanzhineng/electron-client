@@ -1,23 +1,24 @@
 <template>
   <div class="home">
-    <h1>欢迎使用 EasySmart Electron</h1>
-    <p>这是一个基于Vue 3和Pinia重构的Electron应用程序。您可以在此基础上进行开发，构建跨平台的桌面应用。</p>
+    <h1>欢迎使用简单智能控制终端</h1>
+    <p>官方网站 easysmart.top 支持nodejs python开发更多可用程序</p>
     
     <div class="info-grid">
       <div class="info-card">
-        <h3>🚀 关于Electron</h3>
-        <p>Electron是一个使用JavaScript、HTML和CSS构建跨平台桌面应用程序的框架。它基于Node.js和Chromium，让您可以使用Web技术创建原生应用程序体验。</p>
+        <h3>🚀 交流QQ群</h3>
+        <p>970326066 欢迎大家交流使用心得 开发更多玩法</p>
       </div>
       
       <div class="info-card">
-        <h3>⚡ Vue 3特性</h3>
-        <p>本应用使用Vue 3的Composition API，提供更好的TypeScript支持、更小的包体积和更好的性能。响应式系统经过重写，提供更精确的更新。</p>
+        <h3>⚡ 淘宝店铺</h3>
+        <p>
+          <a href="https://shop282688998.taobao.com/" target="_blank" rel="noopener noreferrer" @click="openInBrowser">
+            点击访问淘宝店铺
+          </a>
+          在售卖的商品：简单智能电击终端，锁定终端，跳蛋控制终端
+        </p>
       </div>
       
-      <div class="info-card">
-        <h3>🗃️ Pinia状态管理</h3>
-        <p>使用Pinia作为状态管理库，提供类型安全的store、直观的API和优秀的开发者体验。所有页面状态都会被持久化保存。</p>
-      </div>
       
       <div class="info-card">
         <h3>📊 系统状态</h3>
@@ -71,6 +72,17 @@ import { useServiceStore } from '../stores/serviceStore'
 const deviceStore = useDeviceStore()
 const gameStore = useGameStore()
 const serviceStore = useServiceStore()
+
+// 打开外部浏览器
+const openInBrowser = async (event) => {
+  event.preventDefault() // 阻止默认行为
+  const url = event.target.href || event.target.closest('a').href
+  try {
+    await window.electronAPI.openExternalUrl(url)
+  } catch (error) {
+    console.error('打开外部链接失败:', error)
+  }
+}
 
 onMounted(() => {
   // 初始化各个store

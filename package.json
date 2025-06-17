@@ -47,6 +47,7 @@
     "appId": "com.easysmart",
     "productName": "EasySmart",
     "artifactName": "${productName}-Setup-${version}.${ext}",
+    "icon": "assets/icon.ico",
     "directories": {
       "output": "dist"
     },

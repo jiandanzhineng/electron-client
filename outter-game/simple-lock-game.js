@@ -135,11 +135,28 @@ export class SimpleLockGame {
       console.log('log未定义')
     }
     
-    // 锁定设备
-    const success = await this.deviceManager.executeDeviceAction(
+    // 设置设备属性监听器 - 监听open属性变化
+    this.deviceManager.listenDeviceProperty(this.targetDevice, 'open', (value, data) => {
+      if (this.log) {
+        this.log(`设备open属性变化: ${value}`, 'info')
+      }
+      if (value === 1) {
+        this.log('检测到设备被解锁！', 'warning')
+      }
+    })
+    
+    // 监听设备所有MQTT消息
+    this.deviceManager.listenDeviceMessages(this.targetDevice, (data) => {
+      if (this.log) {
+        this.log(`收到设备消息: ${JSON.stringify(data)}`, 'debug')
+      }
+    })
+    
+    // 锁定设备 - 设置设备属性open为0
+    const success = await this.deviceManager.setDeviceProperty(
       this.targetDevice,
-      'lock',
-      { duration: this.duration }
+      'open',
+      0
     )
     
     if (success) {
@@ -147,6 +164,14 @@ export class SimpleLockGame {
       if (this.log) {
         this.log(`简单锁定游戏开始，持续时间: ${Math.floor(this.duration/60000)}分钟`, 'success')
       }
+      
+      // 示例：发送自定义MQTT消息
+      await this.deviceManager.sendDeviceMqttMessage(this.targetDevice, {
+        type: 'game_start',
+        duration: this.duration,
+        timestamp: Date.now()
+      })
+      
     } else {
       if (this.log) {
         this.log('设备锁定失败', 'error')
@@ -184,6 +209,12 @@ export class SimpleLockGame {
       if (this.log) {
         const remainingSeconds = Math.ceil(remaining / 1000)
         this.log(`游戏循环运行中，剩余: ${remainingSeconds}秒`, 'debug')
+        
+        // 示例：读取设备当前的open属性值
+        const openValue = this.deviceManager.getDeviceProperty(this.targetDevice, 'open')
+        if (openValue !== null) {
+          this.log(`当前设备open属性值: ${openValue}`, 'debug')
+        }
       }
     }
     
@@ -197,11 +228,19 @@ export class SimpleLockGame {
   async end(deviceManager) {
     const totalTime = Date.now() - this.startTime
     
-    // 解锁设备
-    await this.deviceManager.executeDeviceAction(
+    // 解锁设备 - 设置设备属性open为1
+    await this.deviceManager.setDeviceProperty(
       this.targetDevice,
-      'unlock'
+      'open',
+      1
     )
+    
+    // 发送游戏结束消息
+    await this.deviceManager.sendDeviceMqttMessage(this.targetDevice, {
+      type: 'game_end',
+      totalTime: totalTime,
+      timestamp: Date.now()
+    })
     
     if (this.log) {
       this.log(`简单锁定游戏结束，总锁定时间: ${Math.floor(totalTime / 1000)}秒`, 'success')

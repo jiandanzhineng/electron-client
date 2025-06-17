@@ -197,8 +197,11 @@ export default {
     })
     
     const getAvailableDevices = (deviceType) => {
-      if (!deviceType) return deviceStore.devices
-      return deviceStore.devices.filter(device => 
+      // 只返回在线设备
+      const onlineDevices = deviceStore.devices.filter(device => device.connected)
+      
+      if (!deviceType) return onlineDevices
+      return onlineDevices.filter(device => 
         device.type === deviceType || device.capabilities?.includes(deviceType)
       )
     }

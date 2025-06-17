@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cleanOldLogs: () => ipcRenderer.invoke('clean-old-logs'),
   openLogDirectory: () => ipcRenderer.invoke('open-log-directory'),
   
+  // 打开外部浏览器
+  openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
+  
   // 通用IPC调用方法
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
   

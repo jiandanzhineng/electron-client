@@ -9,6 +9,7 @@ class DeviceManager {
     this.deviceMap = new Map()
     this.sensorCallbacks = new Map()
     this.gameplayService = gameplayService
+    this.devicePropertyCache = new Map() // 缓存设备属性状态
   }
   
   /**
@@ -151,11 +152,50 @@ class DeviceManager {
     // 查找对应的逻辑ID
     for (const [logicalId, device] of this.deviceMap) {
       if (device.id === deviceId) {
+        // 获取设备的历史属性缓存
+        const cacheKey = `${logicalId}`
+        const previousData = this.devicePropertyCache.get(cacheKey) || {}
+        
+        // 检查属性变化并触发相应的回调
+        this.checkPropertyChanges(logicalId, previousData, data)
+        
+        // 更新属性缓存
+        this.devicePropertyCache.set(cacheKey, { ...data })
+        
+        // 触发通用消息回调（listenDeviceMessages）
         const callback = this.sensorCallbacks.get(logicalId)
         if (callback) {
           callback(data)
         }
         break
+      }
+    }
+  }
+  
+  /**
+   * 检查属性变化并触发属性监听回调
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {Object} previousData - 之前的属性数据
+   * @param {Object} newData - 新的属性数据
+   */
+  checkPropertyChanges(logicalId, previousData, newData) {
+    // 检查所有属性监听器
+    for (const [callbackKey, callback] of this.sensorCallbacks) {
+      // 属性监听器的key格式: logicalId:property
+      if (callbackKey.startsWith(`${logicalId}:property:`)) {
+        const property = callbackKey.split(':')[2]
+        
+        // 检查该属性是否存在于新数据中
+        if (newData.hasOwnProperty(property)) {
+          const oldValue = previousData[property]
+          const newValue = newData[property]
+          
+          // 只有当属性值真正发生变化时才触发回调
+          if (oldValue !== newValue) {
+            this.sendLog(`设备属性变化: ${logicalId} -> ${property}: ${oldValue} → ${newValue}`, 'debug')
+            callback(newValue, newData)
+          }
+        }
       }
     }
   }
@@ -198,11 +238,158 @@ class DeviceManager {
   }
 
   /**
+   * 设置设备属性
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {string} property - 属性名称
+   * @param {any} value - 属性值
+   */
+  async setDeviceProperty(logicalId, property, value) {
+    const device = this.deviceMap.get(logicalId)
+    if (!device) {
+      this.sendLog(`设备未找到: ${logicalId}`, 'error')
+      return false
+    }
+
+    try {
+      this.sendLog(`设置设备属性: ${device.name} -> ${property} = ${value}`, 'info')
+      
+      // 构造属性更新数据
+      const updateData = {
+        method: 'update',
+        [property]: value
+      }
+      
+      // 发送到设备的MQTT主题
+      const topic = `/drecv/${device.id}`
+      const result = await this.sendMqttMessage(topic, updateData)
+      
+      if (result) {
+        this.sendLog(`设备属性设置成功: ${device.name} -> ${property} = ${value}`, 'success')
+        return true
+      } else {
+        this.sendLog(`设备属性设置失败: ${device.name} -> ${property}`, 'error')
+        return false
+      }
+    } catch (error) {
+      this.sendLog(`设备属性设置异常: ${device.name} -> ${property} (${error.message})`, 'error')
+      return false
+    }
+  }
+
+  /**
+   * 发送MQTT消息到设备
+   * @param {string} topic - MQTT主题
+   * @param {Object} message - 消息内容
+   */
+  async sendMqttMessage(topic, message) {
+    try {
+      // 使用serviceStore的publishMessage方法
+      if (window.electronAPI && window.electronAPI.publishMqttMessage) {
+        const payload = typeof message === 'string' ? message : JSON.stringify(message)
+        const result = await window.electronAPI.publishMqttMessage(topic, payload)
+        
+        if (result.success) {
+          this.sendLog(`MQTT消息发送成功: ${topic}`, 'success')
+          return true
+        } else {
+          this.sendLog(`MQTT消息发送失败: ${result.error || '未知错误'}`, 'error')
+          return false
+        }
+      } else {
+        this.sendLog('MQTT API不可用', 'error')
+        return false
+      }
+    } catch (error) {
+      this.sendLog(`MQTT消息发送异常: ${error.message}`, 'error')
+      return false
+    }
+  }
+
+  /**
+   * 直接发送MQTT消息到指定设备
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {Object} message - 消息内容
+   */
+  async sendDeviceMqttMessage(logicalId, message) {
+    const device = this.deviceMap.get(logicalId)
+    if (!device) {
+      this.sendLog(`设备未找到: ${logicalId}`, 'error')
+      return false
+    }
+
+    const topic = `/drecv/${device.id}`
+    return await this.sendMqttMessage(topic, message)
+  }
+
+  /**
+   * 获取设备属性
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {string} property - 属性名称
+   */
+  getDeviceProperty(logicalId, property) {
+    const device = this.deviceMap.get(logicalId)
+    if (!device) {
+      this.sendLog(`设备未找到: ${logicalId}`, 'error')
+      return null
+    }
+
+    const store = this.initDeviceStore()
+    const actualDevice = store.getDeviceById(device.id)
+    
+    if (actualDevice && actualDevice.data && actualDevice.data.hasOwnProperty(property)) {
+      return actualDevice.data[property]
+    }
+    
+    this.sendLog(`设备属性不存在: ${device.name} -> ${property}`, 'warning')
+    return null
+  }
+
+  /**
+   * 监听设备MQTT消息
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {Function} callback - 消息回调函数
+   */
+  listenDeviceMessages(logicalId, callback) {
+    const device = this.deviceMap.get(logicalId)
+    if (!device) {
+      this.sendLog(`设备未找到: ${logicalId}`, 'error')
+      return false
+    }
+
+    // 注册设备消息监听器
+    this.registerSensorCallback(logicalId, callback)
+    this.sendLog(`开始监听设备消息: ${device.name}`, 'info')
+    return true
+  }
+
+  /**
+   * 监听设备属性变化
+   * @param {string} logicalId - 逻辑设备ID
+   * @param {string} property - 属性名称
+   * @param {Function} callback - 属性变化回调函数
+   */
+  listenDeviceProperty(logicalId, property, callback) {
+    const device = this.deviceMap.get(logicalId)
+    if (!device) {
+      this.sendLog(`设备未找到: ${logicalId}`, 'error')
+      return false
+    }
+
+    // 使用特殊的key格式来标识属性监听器
+    const propertyKey = `${logicalId}:property:${property}`
+    this.sensorCallbacks.set(propertyKey, callback)
+    
+    this.sendLog(`开始监听设备属性: ${device.name} -> ${property}`, 'info')
+    return true
+  }
+
+  /**
    * 清理资源
    */
   cleanup() {
     this.deviceMap.clear()
     this.sensorCallbacks.clear()
+    this.devicePropertyCache.clear()
   }
 }
 
@@ -223,6 +410,59 @@ class GameplayService {
     
     // 绑定方法上下文
     this.executeLoop = this.executeLoop.bind(this)
+    
+    // 初始化MQTT消息监听
+    this.initMqttListener()
+  }
+  
+  /**
+   * 初始化MQTT消息监听
+   */
+  initMqttListener() {
+    if (window.electronAPI && window.electronAPI.onMqttMessage) {
+      window.electronAPI.onMqttMessage((message) => {
+        this.handleMqttMessage(message)
+      })
+    }
+  }
+  
+  /**
+   * 处理MQTT消息
+   * @param {Object} message - MQTT消息对象
+   */
+  handleMqttMessage(message) {
+    try {
+      // 检查是否是设备上报消息 (dpub topic)
+      const topicMatch = message.topic.match(/^\/dpub\/(.+)$/)
+      if (!topicMatch) {
+        return // 不是设备上报topic，忽略
+      }
+      
+      const deviceId = topicMatch[1]
+      
+      // 解析消息内容
+      let payload
+      try {
+        payload = JSON.parse(message.payload)
+      } catch (e) {
+        return // 解析失败，忽略
+      }
+      
+      // 检查是否是report方法
+      if (payload.method !== 'report') {
+        return // 不是上报消息，忽略
+      }
+      
+      // 移除method字段，只保留设备数据
+      const deviceData = { ...payload }
+      delete deviceData.method
+      
+      // 将消息传递给DeviceManager处理
+      this.deviceManager.handleSensorData(deviceId, deviceData)
+      
+    } catch (error) {
+      this.sendLog(`处理MQTT消息失败: ${error.message}`, 'error')
+    }
   }
   
   /**

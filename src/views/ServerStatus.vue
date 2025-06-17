@@ -1,274 +1,199 @@
 <template>
-  <div class="server-status">
-    <div class="header">
+  <el-container class="server-status-el full-width-page">
+    <el-header class="page-header">
       <h1>服务端状态</h1>
       <div class="header-actions">
-        <button @click="refreshStatus" class="btn btn-secondary">
-          🔄 刷新状态
-        </button>
-        <button 
+        <el-button type="primary" @click="refreshStatus" :icon="RefreshRight">刷新状态</el-button>
+        <el-button 
+          :type="serviceStore.mqttConnected ? 'danger' : 'success'" 
           @click="toggleMqttConnection" 
-          :class="['btn', serviceStore.mqttConnected ? 'btn-danger' : 'btn-success']"
+          :icon="serviceStore.mqttConnected ? Connection : CircleCloseFilled"
         >
-          {{ serviceStore.mqttConnected ? '🔌 断开MQTT' : '🔗 连接MQTT' }}
-        </button>
+          {{ serviceStore.mqttConnected ? '断开MQTT' : '连接MQTT' }}
+        </el-button>
       </div>
-    </div>
+    </el-header>
+    <el-main class="page-main">
+      <el-row :gutter="20">
+        <el-col :xs="24" :sm="24" :md="12" class="card-col">
+          <el-card class="status-card" shadow="hover">
+            <template #header>
+              <div class="card-header-title">
+                <el-icon><Connection /></el-icon>
+                <span>MQTT连接状态</span>
+                <el-tag :type="serviceStore.mqttConnected ? 'success' : 'danger'" size="small" style="margin-left: 10px;">
+                  {{ serviceStore.mqttConnected ? '已连接' : '未连接' }}
+                </el-tag>
+              </div>
+            </template>
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="服务器地址">{{ serviceStore.mqttConfig.host }}:{{ serviceStore.mqttConfig.port }}</el-descriptions-item>
+              <el-descriptions-item label="用户名" v-if="serviceStore.mqttConfig.username">{{ serviceStore.mqttConfig.username }}</el-descriptions-item>
+              <el-descriptions-item label="连接时间">{{ formatConnectionTime() }}</el-descriptions-item>
+            </el-descriptions>
+            <el-divider content-position="left">连接配置</el-divider>
+            <el-form label-position="top" :model="serviceStore.mqttConfig">
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="主机地址">
+                    <el-input value="easysmart.local" disabled readonly />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="端口">
+                    <el-input value="1883" type="number" disabled readonly />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="用户名">
+                    <el-input v-model="serviceStore.mqttConfig.username" :disabled="serviceStore.mqttConnected" placeholder="可选" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="密码">
+                    <el-input v-model="serviceStore.mqttConfig.password" type="password" :disabled="serviceStore.mqttConnected" placeholder="可选" show-password />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </el-form>
+          </el-card>
 
-    <div class="status-grid">
-      <!-- MQTT连接状态 -->
-      <div class="status-card">
-        <div class="card-header">
-          <h2>🔗 MQTT连接状态</h2>
-          <span :class="['connection-status', serviceStore.mqttConnected ? 'connected' : 'disconnected']">
-            {{ serviceStore.mqttConnected ? '已连接' : '未连接' }}
-          </span>
-        </div>
-        <div class="card-content">
-          <div class="connection-info">
-            <div class="info-row">
-              <label>服务器地址:</label>
-              <span>{{ serviceStore.mqttConfig.host }}:{{ serviceStore.mqttConfig.port }}</span>
-            </div>
-            <div class="info-row" v-if="serviceStore.mqttConfig.username">
-              <label>用户名:</label>
-              <span>{{ serviceStore.mqttConfig.username }}</span>
-            </div>
-            <div class="info-row">
-              <label>连接时间:</label>
-              <span>{{ formatConnectionTime() }}</span>
-            </div>
-          </div>
-          
-          <div class="mqtt-config">
-            <h3>连接配置</h3>
-            <div class="config-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>主机地址:</label>
-                  <input 
-                    value="easysmart.local" 
-                    type="text" 
-                    disabled
-                    readonly
-                  >
+          <el-card class="status-card" shadow="hover">
+            <template #header>
+              <div class="card-header-title">
+                <el-icon><Cpu /></el-icon>
+                <span>系统资源监控</span>
+              </div>
+            </template>
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="内存使用">
+                <el-progress :percentage="getMemoryUsage()" :stroke-width="10" :format="() => `${getMemoryUsage()}%`" style="width:100%"/>
+              </el-descriptions-item>
+              <el-descriptions-item label="运行时间">{{ uptime }}</el-descriptions-item>
+            </el-descriptions>
+            <el-divider content-position="left">系统信息</el-divider>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="操作系统">{{ systemInfo.platform }}</el-descriptions-item>
+              <el-descriptions-item label="Node.js">{{ systemInfo.versions.node }}</el-descriptions-item>
+              <el-descriptions-item label="Electron">{{ systemInfo.versions.electron }}</el-descriptions-item>
+              <el-descriptions-item label="Chrome">{{ systemInfo.versions.chrome }}</el-descriptions-item>
+            </el-descriptions>
+          </el-card>
+        </el-col>
+
+        <el-col :xs="24" :sm="24" :md="12" class="card-col">
+          <el-card class="status-card" shadow="hover">
+            <template #header>
+              <div class="card-header-title">
+                <el-icon><Tickets /></el-icon>
+                <span>设备连接统计</span>
+              </div>
+            </template>
+            <el-row :gutter="20" class="stats-row">
+              <el-col :span="12"><el-statistic title="总设备数" :value="deviceStore.devices.length" /></el-col>
+              <el-col :span="12"><el-statistic title="在线设备" :value="deviceStore.connectedDevices.length" /></el-col>
+              <el-col :span="12"><el-statistic title="离线设备" :value="deviceStore.disconnectedDevices.length" /></el-col>
+              <el-col :span="12"><el-statistic title="连接率" :value="getConnectionRate()" suffix="%" /></el-col>
+            </el-row>
+            <el-divider content-position="left">设备类型分布</el-divider>
+            <el-table :data="deviceTypeStatsForTable" stripe size="small" max-height="200">
+              <el-table-column prop="type" label="类型" />
+              <el-table-column prop="count" label="数量" width="80" align="center"/>
+            </el-table>
+          </el-card>
+
+          <el-card class="status-card" shadow="hover">
+            <template #header>
+              <div class="card-header-title">
+                <el-icon><Setting /></el-icon>
+                <span>服务运行状态</span>
+              </div>
+            </template>
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="MDNS服务">
+                <template #default>
+                  <el-tag :type="serviceStore.serviceStatus.mdns === 'running' ? 'success' : 'danger'" size="small">
+                    {{ serviceStore.getServiceStatusText('mdns') }}
+                  </el-tag>
+                  <span class="service-desc">设备发现服务</span>
+                </template>
+              </el-descriptions-item>
+              <el-descriptions-item label="MQTT服务">
+                <template #default>
+                  <el-tag :type="serviceStore.serviceStatus.mqtt === 'running' ? 'success' : 'danger'" size="small">
+                    {{ serviceStore.getServiceStatusText('mqtt') }}
+                  </el-tag>
+                  <span class="service-desc">消息队列服务</span>
+                </template>
+              </el-descriptions-item>
+              <el-descriptions-item label="API服务">
+                <template #default>
+                  <el-tag :type="serviceStore.serviceStatus.api === 'running' ? 'success' : 'danger'" size="small">
+                    {{ serviceStore.getServiceStatusText('api') }}
+                  </el-tag>
+                  <span class="service-desc">Web API服务</span>
+                </template>
+              </el-descriptions-item>
+            </el-descriptions>
+            <el-divider content-position="left">服务概要</el-divider>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="运行中服务">{{ getRunningServicesCount() }}/3</el-descriptions-item>
+              <el-descriptions-item label="API端口">{{ serviceStore.serverConfig.port }}</el-descriptions-item>
+              <el-descriptions-item label="运行模式">{{ serviceStore.serverConfig.mode === 'development' ? '开发模式' : '生产模式' }}</el-descriptions-item>
+            </el-descriptions>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <el-row style="margin-top: 20px;">
+        <el-col :span="24">
+          <el-card class="logs-section-el" shadow="hover">
+            <template #header>
+              <div class="card-header-title">
+                <el-icon><Document /></el-icon>
+                <span>实时日志</span>
+                <div class="logs-actions">
+                  <el-button type="info" :icon="Delete" @click="clearLogs" size="small" plain>清空</el-button>
+                  <el-button type="success" :icon="Download" @click="exportLogs" size="small" plain>导出</el-button>
                 </div>
-                <div class="form-group">
-                  <label>端口:</label>
-                  <input 
-                    value="1883" 
-                    type="number" 
-                    disabled
-                    readonly
-                  >
-                </div>
               </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>用户名:</label>
-                  <input 
-                    v-model="serviceStore.mqttConfig.username" 
-                    type="text" 
-                    :disabled="serviceStore.mqttConnected"
-                    placeholder="可选"
-                  >
-                </div>
-                <div class="form-group">
-                  <label>密码:</label>
-                  <input 
-                    v-model="serviceStore.mqttConfig.password" 
-                    type="password" 
-                    :disabled="serviceStore.mqttConnected"
-                    placeholder="可选"
-                  >
-                </div>
+            </template>
+            <el-scrollbar height="300px" class="logs-container-el">
+              <div v-if="serviceStore.serverLogs.length === 0" class="no-logs-el">
+                <el-empty description="暂无日志信息" :image-size="60"/>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 设备连接统计 -->
-      <div class="status-card">
-        <div class="card-header">
-          <h2>📱 设备连接统计</h2>
-        </div>
-        <div class="card-content">
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-number">{{ deviceStore.devices.length }}</div>
-              <div class="stat-label">总设备数</div>
-            </div>
-            <div class="stat-item online">
-              <div class="stat-number">{{ deviceStore.connectedDevices.length }}</div>
-              <div class="stat-label">在线设备</div>
-            </div>
-            <div class="stat-item offline">
-              <div class="stat-number">{{ deviceStore.disconnectedDevices.length }}</div>
-              <div class="stat-label">离线设备</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-number">{{ getConnectionRate() }}%</div>
-              <div class="stat-label">连接率</div>
-            </div>
-          </div>
-          
-          <div class="device-types">
-            <h3>设备类型分布</h3>
-            <div class="type-list">
-              <div 
-                v-for="(count, type) in getDeviceTypeStats()" 
-                :key="type" 
-                class="type-item"
-              >
-                <span class="type-name">{{ deviceStore.deviceTypeMap[type] || type }}</span>
-                <span class="type-count">{{ count }}</span>
+              <div v-for="log in recentLogs" :key="log.id" class="log-entry-el">
+                <span class="log-timestamp-el">{{ log.timestamp }}</span>
+                <span class="log-message-el">{{ log.message }}</span>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 服务运行状态 -->
-      <div class="status-card">
-        <div class="card-header">
-          <h2>⚙️ 服务运行状态</h2>
-        </div>
-        <div class="card-content">
-          <div class="services-list">
-            <div class="service-item">
-              <div class="service-info">
-                <span class="service-name">MDNS服务</span>
-                <span class="service-desc">设备发现服务</span>
-              </div>
-              <span :class="['service-status', serviceStore.serviceStatus.mdns]">
-                {{ serviceStore.getServiceStatusText('mdns') }}
-              </span>
-            </div>
-            
-            <div class="service-item">
-              <div class="service-info">
-                <span class="service-name">MQTT服务</span>
-                <span class="service-desc">消息队列服务</span>
-              </div>
-              <span :class="['service-status', serviceStore.serviceStatus.mqtt]">
-                {{ serviceStore.getServiceStatusText('mqtt') }}
-              </span>
-            </div>
-            
-            <div class="service-item">
-              <div class="service-info">
-                <span class="service-name">API服务</span>
-                <span class="service-desc">Web API服务</span>
-              </div>
-              <span :class="['service-status', serviceStore.serviceStatus.api]">
-                {{ serviceStore.getServiceStatusText('api') }}
-              </span>
-            </div>
-          </div>
-          
-          <div class="service-summary">
-            <div class="summary-item">
-              <label>运行中服务:</label>
-              <span>{{ getRunningServicesCount() }}/3</span>
-            </div>
-            <div class="summary-item">
-              <label>API端口:</label>
-              <span>{{ serviceStore.serverConfig.port }}</span>
-            </div>
-            <div class="summary-item">
-              <label>运行模式:</label>
-              <span>{{ serviceStore.serverConfig.mode === 'development' ? '开发模式' : '生产模式' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 系统资源监控 -->
-      <div class="status-card">
-        <div class="card-header">
-          <h2>💻 系统资源监控</h2>
-        </div>
-        <div class="card-content">
-          <div class="resource-stats">
-            <div class="resource-item">
-              <label>内存使用:</label>
-              <div class="resource-bar">
-                <div class="resource-fill" :style="{ width: getMemoryUsage() + '%' }"></div>
-              </div>
-              <span class="resource-text">{{ getMemoryUsage() }}%</span>
-            </div>
-            
-            <div class="resource-item">
-              <label>运行时间:</label>
-              <span class="resource-text">{{ uptime }}</span>
-            </div>
-          </div>
-          
-          <div class="system-info">
-            <h3>系统信息</h3>
-            <div class="info-grid">
-              <div class="info-item">
-                <label>操作系统:</label>
-                <span>{{ systemInfo.platform }}</span>
-              </div>
-              <div class="info-item">
-                <label>Node.js:</label>
-                <span>{{ systemInfo.versions.node }}</span>
-              </div>
-              <div class="info-item">
-                <label>Electron:</label>
-                <span>{{ systemInfo.versions.electron }}</span>
-              </div>
-              <div class="info-item">
-                <label>Chrome:</label>
-                <span>{{ systemInfo.versions.chrome }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 实时日志 -->
-    <div class="logs-section">
-      <div class="logs-header">
-        <h2>📋 实时日志</h2>
-        <div class="logs-actions">
-          <button @click="clearLogs" class="btn btn-secondary btn-sm">
-            🗑️ 清空
-          </button>
-          <button @click="exportLogs" class="btn btn-secondary btn-sm">
-            📤 导出
-          </button>
-        </div>
-      </div>
-      
-      <div class="logs-container" ref="logsContainer">
-        <div v-if="serviceStore.serverLogs.length === 0" class="no-logs">
-          暂无日志信息
-        </div>
-        <div 
-          v-for="log in recentLogs" 
-          :key="log.id" 
-          class="log-entry"
-        >
-          <span class="log-timestamp">{{ log.timestamp }}</span>
-          <span class="log-message">{{ log.message }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
+            </el-scrollbar>
+          </el-card>
+        </el-col>
+      </el-row>
+    </el-main>
+  </el-container>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDeviceStore } from '../stores/deviceStore'
 import { useServiceStore } from '../stores/serviceStore'
+import {
+  RefreshRight,
+  Connection,
+  CircleCloseFilled,
+  Cpu,
+  Tickets,
+  Setting,
+  Document,
+  Delete,
+  Download
+} from '@element-plus/icons-vue'
 
 const deviceStore = useDeviceStore()
 const serviceStore = useServiceStore()
-const logsContainer = ref(null)
 const connectionTime = ref(null)
 const uptimeInterval = ref(null)
 const uptime = ref('00:00:00')
@@ -282,11 +207,18 @@ const systemInfo = ref({
 })
 
 const recentLogs = computed(() => {
-  return serviceStore.serverLogs.slice(-50) // 只显示最近50条日志
+  return serviceStore.serverLogs.slice(-100) // 显示最近100条日志
+})
+
+const deviceTypeStatsForTable = computed(() => {
+  const stats = getDeviceTypeStats()
+  return Object.entries(stats).map(([type, count]) => ({
+    type: deviceStore.deviceTypeMap[type] || type,
+    count
+  }))
 })
 
 onMounted(async () => {
-  // 获取系统信息
   try {
     if (window.electronAPI && window.electronAPI.getSystemInfo) {
       const info = await window.electronAPI.getSystemInfo()
@@ -306,10 +238,8 @@ onMounted(async () => {
   }
   deviceStore.initDeviceList()
   
-  // 初始化运行时间
   uptime.value = await getUptime()
   
-  // 每秒更新一次运行时间
   uptimeInterval.value = setInterval(async () => {
     uptime.value = await getUptime()
   }, 1000)
@@ -374,7 +304,7 @@ function getRunningServicesCount() {
 }
 
 function getMemoryUsage() {
-  // 模拟内存使用率
+  // 模拟内存使用率, 实际项目中应从后端获取
   return Math.floor(Math.random() * 30 + 40) // 40-70%
 }
 
@@ -384,7 +314,6 @@ async function getUptime() {
       const result = await window.electronAPI.getSystemUptime()
       return result.formatted
     } else {
-      // 浏览器环境下的fallback
       return '00:00:00'
     }
   } catch (error) {
@@ -410,478 +339,150 @@ function exportLogs() {
 </script>
 
 <style scoped>
-.server-status {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+.full-width-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.header {
+.server-status-el {
+  background-color: #f4f6f8; /* Element Plus 风格的浅灰色背景 */
+}
+
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e1e8ed;
+  padding: 10px 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e4e7ed;
+  height: auto; /* 调整 Header 高度 */
 }
 
-.header h1 {
-  color: #2c3e50;
+.page-header h1 {
+  font-size: 20px;
+  color: #303133;
   margin: 0;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
+.page-main {
+  padding: 20px;
+  overflow-y: auto;
+  flex-grow: 1;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+.card-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 卡片之间的垂直间距 */
 }
 
 .status-card {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
-  overflow: hidden;
-}
-
-.card-header {
-  background: #f8f9fa;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e1e8ed;
+  flex-grow: 1; /* 使卡片在列中均匀分布高度 */
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
 }
 
-.card-header h2 {
-  margin: 0;
-  color: #2c3e50;
+.status-card .el-card__body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header-title {
+  display: flex;
+  align-items: center;
   font-size: 16px;
-}
-
-.connection-status {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.connection-status.connected {
-  background: #d4edda;
-  color: #155724;
-}
-
-.connection-status.disconnected {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.card-content {
-  padding: 20px;
-}
-
-.connection-info {
-  margin-bottom: 20px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-row label {
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.mqtt-config h3 {
-  color: #2c3e50;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
-
-.config-form {
-  display: grid;
-  gap: 15px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.form-group label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.form-group input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.stat-item.online {
-  background: #d4edda;
-}
-
-.stat-item.offline {
-  background: #f8d7da;
-}
-
-.stat-number {
-  font-size: 24px;
   font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 5px;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: #7f8c8d;
-  text-transform: uppercase;
+.card-header-title .el-icon {
+  margin-right: 8px;
 }
 
-.device-types h3 {
-  color: #2c3e50;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
-
-.type-list {
-  display: grid;
-  gap: 8px;
-}
-
-.type-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border-radius: 4px;
-}
-
-.type-name {
-  color: #2c3e50;
-  font-size: 14px;
-}
-
-.type-count {
-  background: #3498db;
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.services-list {
-  display: grid;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.service-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.service-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.service-name {
-  font-weight: 600;
-  color: #2c3e50;
+.stats-row .el-col {
+  margin-bottom: 10px;
 }
 
 .service-desc {
   font-size: 12px;
-  color: #7f8c8d;
+  color: #909399;
+  margin-left: 10px;
 }
 
-.service-status {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.service-status.running {
-  background: #d4edda;
-  color: #155724;
-}
-
-.service-status.stopped {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.service-summary {
-  display: grid;
-  gap: 10px;
-}
-
-.summary-item {
-  display: flex;
+.logs-section-el .card-header-title {
+  width: 100%;
   justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
 }
 
-.summary-item:last-child {
-  border-bottom: none;
+.logs-actions .el-button {
+  margin-left: 10px;
 }
 
-.summary-item label {
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.resource-stats {
-  display: grid;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.resource-item {
-  display: grid;
-  grid-template-columns: 80px 1fr 50px;
-  gap: 10px;
-  align-items: center;
-}
-
-.resource-item label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.resource-bar {
-  height: 8px;
-  background: #e1e8ed;
+.logs-container-el {
+  background-color: #2d2d2d;
   border-radius: 4px;
-  overflow: hidden;
+  padding: 10px;
 }
 
-.resource-fill {
+.no-logs-el {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 100%;
-  background: linear-gradient(90deg, #27ae60, #f39c12, #e74c3c);
-  transition: width 0.3s ease;
+  min-height: 100px; /* 确保在没有日志时也有一定高度 */
 }
 
-.resource-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: #2c3e50;
-  text-align: right;
-}
-
-.system-info h3 {
-  color: #2c3e50;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
-
-.info-grid {
-  display: grid;
-  gap: 8px;
-}
-
-.info-item {
+.log-entry-el {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-item:last-child {
-  border-bottom: none;
-}
-
-.info-item label {
-  font-size: 12px;
-  color: #7f8c8d;
-}
-
-.info-item span {
-  font-size: 12px;
-  color: #2c3e50;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-}
-
-.logs-section {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
-  overflow: hidden;
-}
-
-.logs-header {
-  background: #f8f9fa;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e1e8ed;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logs-header h2 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 16px;
-}
-
-.logs-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.logs-container {
-  background: #1e1e1e;
-  color: #f8f8f2;
-  padding: 15px;
-  height: 300px;
-  overflow-y: auto;
+  margin-bottom: 4px;
+  padding: 2px 4px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: #e0e0e0;
+  border-radius: 2px;
 }
 
-.no-logs {
-  color: #7f8c8d;
-  text-align: center;
-  font-style: italic;
-  padding: 20px;
+.log-entry-el:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.log-entry {
-  display: flex;
-  margin-bottom: 5px;
-  padding: 2px 0;
-}
-
-.log-timestamp {
-  color: #6c7b7f;
+.log-timestamp-el {
+  color: #888;
   margin-right: 10px;
-  min-width: 80px;
-  font-size: 11px;
-}
-
-.log-message {
-  color: #f8f8f2;
-  flex: 1;
-}
-
-/* 按钮样式 */
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #3498db;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2980b9;
-}
-
-.btn-secondary {
-  background: #95a5a6;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #7f8c8d;
-}
-
-.btn-success {
-  background: #27ae60;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: #229954;
-}
-
-.btn-danger {
-  background: #e74c3c;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #c0392b;
-}
-
-.btn-sm {
-  padding: 6px 12px;
+  min-width: 130px; /* 调整时间戳宽度以适应 YYYY-MM-DD HH:mm:ss */
   font-size: 12px;
 }
+
+.log-message-el {
+  color: #d4d4d4;
+  flex: 1;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* Element Plus 组件的微调 */
+.el-descriptions {
+  margin-top: 10px;
+}
+
+.el-divider {
+  margin: 15px 0;
+}
+
+.el-statistic {
+  text-align: center;
+}
+
+.el-statistic__head {
+  font-size: 13px !important;
+  color: #606266 !important;
+}
+
+.el-statistic__content {
+  font-size: 22px !important;
+}
+
 </style>

@@ -384,6 +384,10 @@ export const useServiceStore = defineStore('service', {
           // 处理设备上报消息
           this.handleDeviceReport(message)
         })
+        
+        // 启动后自动尝试连接MQTT
+        this.addServerLog('正在自动尝试连接MQTT...')
+        this.connectMqtt()
       }
     }
   }

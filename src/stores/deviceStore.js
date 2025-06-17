@@ -125,13 +125,22 @@ export const useDeviceStore = defineStore('device', {
       }
     },
 
-    // 标记设备离线并删除设备（1分钟未收到消息则删除）
+    // 标记设备离线（1分钟未收到消息则标记为离线）
     markDeviceOffline(deviceId) {
       const device = this.getDeviceById(deviceId)
       if (device) {
-        // 1分钟未收到消息则删除设备
-        this.removeDevice(deviceId)
-        console.log(`设备 ${deviceId} 超过1分钟未上报，已自动删除`)
+        // 1分钟未收到消息则标记设备为离线
+        device.connected = false
+        this.saveDevices()
+        this.updateDeviceTable()
+        
+        // 清除定时器
+        if (this.deviceTimeouts.has(deviceId)) {
+          clearTimeout(this.deviceTimeouts.get(deviceId))
+          this.deviceTimeouts.delete(deviceId)
+        }
+        
+        console.log(`设备 ${deviceId} 超过1分钟未上报，已标记为离线`)
       }
     },
 
