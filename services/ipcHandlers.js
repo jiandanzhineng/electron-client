@@ -218,6 +218,50 @@ class IPCHandlers {
       }
     });
 
+    // 写入文件内容
+    ipcMain.handle('write-file', async (event, { filePath, content }) => {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      try {
+        // 确保目录存在
+        const dir = path.dirname(filePath);
+        await fs.mkdir(dir, { recursive: true });
+        
+        await fs.writeFile(filePath, content, 'utf8');
+        return { success: true };
+      } catch (error) {
+        logger.error('写入文件失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 确保目录存在
+    ipcMain.handle('ensure-directory', async (event, dirPath) => {
+      const fs = require('fs').promises;
+      
+      try {
+        await fs.mkdir(dirPath, { recursive: true });
+        return { success: true };
+      } catch (error) {
+        logger.error('创建目录失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 显示文件选择对话框
+    ipcMain.handle('show-open-dialog', async (event, options) => {
+      const { dialog } = require('electron');
+      
+      try {
+        const result = await dialog.showOpenDialog(options);
+        return result;
+      } catch (error) {
+        logger.error('显示文件选择对话框失败', 'ipc', error);
+        return { canceled: true, error: error.message };
+      }
+    });
+
     // 获取应用日志
     ipcMain.handle('get-app-logs', async (event, lines = 100) => {
       try {

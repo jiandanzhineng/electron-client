@@ -1,7 +1,12 @@
 <template>
   <div class="game-list">
     <div class="header">
-      <h1>游戏列表</h1>
+      <div class="header-top">
+        <h1>游戏列表</h1>
+        <div class="custom-tip">
+          如有想玩的玩法可以联系官方免费定制~QQ群970326066
+        </div>
+      </div>
       <div class="header-actions">
         <div class="search-box">
           <input 
@@ -18,9 +23,6 @@
             {{ category }}
           </option>
         </select>
-        <button @click="showAddGameModal = true" class="btn btn-primary">
-          ➕ 添加游戏
-        </button>
         <button @click="refreshGames" class="btn btn-secondary">
           🔄 刷新
         </button>
@@ -30,32 +32,12 @@
       </div>
     </div>
 
-    <!-- 游戏统计 -->
-    <div class="stats-section">
-      <div class="stat-card">
-        <div class="stat-number">{{ gameStore.games.length }}</div>
-        <div class="stat-label">总游戏数</div>
-      </div>
-      <div class="stat-card running">
-        <div class="stat-number">{{ gameStore.runningGames.length }}</div>
-        <div class="stat-label">运行中</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ gameStore.categories.length }}</div>
-        <div class="stat-label">分类数</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number">{{ getAveragePlayTime() }}</div>
-        <div class="stat-label">平均游戏时长</div>
-      </div>
-    </div>
-
     <!-- 游戏列表 -->
     <div class="games-container">
       <div v-if="filteredGames.length === 0" class="no-games">
         <div class="no-games-icon">🎮</div>
         <div class="no-games-text">
-          {{ searchQuery || selectedCategory ? '没有找到匹配的游戏' : '暂无游戏，点击添加游戏开始' }}
+          {{ searchQuery || selectedCategory ? '没有找到匹配的游戏' : '暂无游戏，可以加载外部玩法开始体验' }}
         </div>
       </div>
       
@@ -146,69 +128,44 @@
               <label>最后游戏:</label>
               <span>{{ formatDate(game.lastPlayed) }}</span>
             </div>
-            <div class="detail-item">
-              <label>游戏时长:</label>
-              <span>{{ formatPlayTime(game.totalPlayTime) }}</span>
+            <div class="detail-item" v-if="game.type === 'external_gameplay' && game.requiredDevices && game.requiredDevices.length > 0">
+              <label>必备设备:</label>
+              <span class="device-tags">
+                <span 
+                  v-for="device in game.requiredDevices.filter(d => d.required)" 
+                  :key="device.type" 
+                  class="device-tag required"
+                >
+                  {{ device.type }}
+                </span>
+                <span v-if="game.requiredDevices.filter(d => d.required).length === 0" class="no-devices">无</span>
+              </span>
+            </div>
+            <div class="detail-item" v-if="game.type === 'external_gameplay' && game.requiredDevices && game.requiredDevices.length > 0">
+              <label>可选设备:</label>
+              <span class="device-tags">
+                <span 
+                  v-for="device in game.requiredDevices.filter(d => !d.required)" 
+                  :key="device.type" 
+                  class="device-tag optional"
+                >
+                  {{ device.type }}
+                </span>
+                <span v-if="game.requiredDevices.filter(d => !d.required).length === 0" class="no-devices">无</span>
+              </span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 加载外部玩法模态框 -->
-    <div v-if="showLoadGameplayModal" class="modal-overlay" @click="cancelLoadGameplay">
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h2>加载外部玩法</h2>
-          <button @click="cancelLoadGameplay" class="modal-close">✕</button>
-        </div>
-        
-        <div class="modal-body">
-          <div class="form-group">
-            <label>选择玩法文件 *</label>
-            <div class="file-input-container">
-              <input 
-                ref="gameplayFileInput"
-                type="file" 
-                accept=".js"
-                @change="handleFileSelect"
-                style="display: none;"
-              >
-              <div class="file-display">
-                <span v-if="selectedGameplayFile">{{ selectedGameplayFile.name }}</span>
-                <span v-else class="placeholder">未选择文件</span>
-              </div>
-              <button type="button" @click="selectGameplayFile" class="btn btn-secondary">
-                📁 选择文件
-              </button>
-            </div>
-            <div class="file-hint">
-              请选择位于 /e:/develop/electron-client/outter-game/ 目录中的 JavaScript 玩法文件
-            </div>
-          </div>
-          
-          <div class="form-actions">
-            <button type="button" @click="cancelLoadGameplay" class="btn btn-secondary">
-              取消
-            </button>
-            <button 
-              type="button" 
-              @click="loadExternalGameplay" 
-              class="btn btn-primary"
-              :disabled="!selectedGameplayFile || isLoadingGameplay"
-            >
-              {{ isLoadingGameplay ? '加载中...' : '加载玩法' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 移除了加载外部玩法模态框，现在直接弹出文件选择对话框 -->
 
-    <!-- 添加/编辑游戏模态框 -->
-    <div v-if="showAddGameModal || editingGame" class="modal-overlay" @click="closeModal">
+    <!-- 编辑游戏模态框 -->
+    <div v-if="editingGame" class="modal-overlay" @click="closeModal">
       <div class="modal" @click.stop>
         <div class="modal-header">
-          <h2>{{ editingGame ? '编辑游戏' : '添加游戏' }}</h2>
+          <h2>编辑游戏</h2>
           <button @click="closeModal" class="modal-close">✕</button>
         </div>
         
@@ -299,14 +256,10 @@ const router = useRouter()
 const gameStore = useGameStore()
 const searchQuery = ref('')
 const selectedCategory = ref('')
-const showAddGameModal = ref(false)
 const editingGame = ref(null)
 const newCategory = ref('')
 
 // 外部玩法加载相关
-const showLoadGameplayModal = ref(false)
-const selectedGameplayFile = ref(null)
-const gameplayFileInput = ref(null)
 const isLoadingGameplay = ref(false)
 
 const gameForm = ref({
@@ -338,8 +291,10 @@ const filteredGames = computed(() => {
   return games
 })
 
-onMounted(() => {
+onMounted(async () => {
   gameStore.initGameList()
+  // 自动加载保存在easysmart目录中的玩法
+  await loadSavedGameplays()
 })
 
 function selectGame(game) {
@@ -420,7 +375,6 @@ function refreshGames() {
 }
 
 function closeModal() {
-  showAddGameModal.value = false
   editingGame.value = null
   gameForm.value = {
     name: '',
@@ -482,56 +436,39 @@ function formatPlayTime(minutes) {
   return `${mins}分钟`
 }
 
-function getAveragePlayTime() {
-  const games = gameStore.games
-  if (games.length === 0) return '0分钟'
-  
-  const totalTime = games.reduce((sum, game) => sum + (game.totalPlayTime || 0), 0)
-  const avgTime = Math.round(totalTime / games.length)
-  
-  return formatPlayTime(avgTime)
-}
-
 // === 外部玩法加载相关方法 ===
 
-function showLoadGameplayDialog() {
-  showLoadGameplayModal.value = true
-  selectedGameplayFile.value = null
+async function showLoadGameplayDialog() {
+  // 直接调用加载外部玩法函数
+  await loadExternalGameplay()
 }
 
-function selectGameplayFile() {
-  gameplayFileInput.value?.click()
-}
-
-function handleFileSelect(event) {
-  const file = event.target.files[0]
-  if (file) {
-    if (!file.name.endsWith('.js')) {
-      alert('请选择JavaScript文件（.js）')
-      return
-    }
-    selectedGameplayFile.value = file
-  }
-}
+// 移除了不再使用的文件选择处理函数
 
 async function loadExternalGameplay() {
-  if (!selectedGameplayFile.value) {
-    alert('请先选择玩法文件')
-    return
-  }
-  
   isLoadingGameplay.value = true
   
   try {
-    // 构建文件路径（假设文件在outter-game目录中）
-    const filePath = `e:/develop/electron-client/outter-game/${selectedGameplayFile.value.name}`
+    // 直接使用Electron的文件选择对话框获取完整路径
+    const result = await window.electronAPI?.invoke('show-open-dialog', {
+      title: '选择外部玩法文件',
+      filters: [{ name: 'JavaScript Files', extensions: ['js'] }],
+      properties: ['openFile']
+    })
+    
+    if (!result || result.canceled || !result.filePaths.length) {
+      return // 用户取消选择
+    }
+    
+    const fullPath = result.filePaths[0]
     
     // 加载外部玩法
-    const config = await gameStore.loadExternalGameplay(filePath)
+    const config = await gameStore.loadExternalGameplay(fullPath)
+    
+    // 保存玩法到C:\easysmart目录
+    await saveGameplayToEasySmart(fullPath, config)
     
     alert(`外部玩法 "${config.title}" 加载成功！`)
-    showLoadGameplayModal.value = false
-    selectedGameplayFile.value = null
     
     // 刷新游戏列表
     refreshGames()
@@ -544,10 +481,163 @@ async function loadExternalGameplay() {
   }
 }
 
-function cancelLoadGameplay() {
-  showLoadGameplayModal.value = false
-  selectedGameplayFile.value = null
+// 移除了不再使用的cancelLoadGameplay函数
+
+/**
+ * 保存玩法到C:\easysmart目录
+ * @param {string} originalPath - 原始文件路径
+ * @param {Object} config - 玩法配置
+ */
+async function saveGameplayToEasySmart(originalPath, config) {
+  try {
+    const easysmartDir = 'C:\\easysmart\\gameplays'
+    
+    // 确保目录存在
+    await window.electronAPI?.invoke('ensure-directory', easysmartDir)
+    
+    // 读取原始文件内容
+    const fileContent = await window.electronAPI?.invoke('read-file', originalPath)
+    if (!fileContent.success) {
+      throw new Error(`读取原始文件失败: ${fileContent.error}`)
+    }
+    
+    // 生成保存的文件名（使用玩法标题作为文件名）
+    const safeTitle = config.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')
+    const savedFileName = `${safeTitle}_v${config.version || '1.0.0'}.js`
+    const savedPath = `${easysmartDir}\\${savedFileName}`
+    
+    // 保存文件到easysmart目录
+    const saveResult = await window.electronAPI?.invoke('write-file', {
+      filePath: savedPath,
+      content: fileContent.content
+    })
+    
+    if (!saveResult.success) {
+      throw new Error(`保存文件失败: ${saveResult.error}`)
+    }
+    
+    // 更新gameStore中的配置路径为新的保存路径
+    await gameStore.updateGameplayPath(config.title, savedPath)
+    
+    console.log(`玩法已保存到: ${savedPath}`)
+    
+    // 保存玩法索引信息
+    await saveGameplayIndex(config, savedPath)
+    
+  } catch (error) {
+    console.error('保存玩法到easysmart目录失败:', error)
+    // 不抛出错误，因为这不应该阻止玩法加载
+  }
 }
+
+/**
+ * 保存玩法索引信息
+ * @param {Object} config - 玩法配置
+ * @param {string} savedPath - 保存路径
+ */
+async function saveGameplayIndex(config, savedPath) {
+  try {
+    const indexPath = 'C:\\easysmart\\gameplays\\index.json'
+    
+    // 读取现有索引
+    let index = []
+    const indexResult = await window.electronAPI?.invoke('read-file', indexPath)
+    if (indexResult.success) {
+      try {
+        index = JSON.parse(indexResult.content)
+      } catch (e) {
+        console.warn('索引文件格式错误，将创建新索引')
+      }
+    }
+    
+    // 检查是否已存在同名玩法
+    const existingIndex = index.findIndex(item => item.title === config.title)
+    
+    const gameplayInfo = {
+      title: config.title,
+      description: config.description,
+      version: config.version || '1.0.0',
+      author: config.author || '未知作者',
+      filePath: savedPath,
+      savedAt: new Date().toISOString(),
+      requiredDevices: config.requiredDevices || []
+    }
+    
+    if (existingIndex >= 0) {
+      // 更新现有记录
+      index[existingIndex] = gameplayInfo
+    } else {
+      // 添加新记录
+      index.push(gameplayInfo)
+    }
+    
+    // 保存索引文件
+    await window.electronAPI?.invoke('write-file', {
+      filePath: indexPath,
+      content: JSON.stringify(index, null, 2)
+    })
+    
+  } catch (error) {
+     console.error('保存玩法索引失败:', error)
+   }
+ }
+ 
+ /**
+  * 自动加载保存在easysmart目录中的玩法
+  */
+ async function loadSavedGameplays() {
+   try {
+     const indexPath = 'C:\\easysmart\\gameplays\\index.json'
+     
+     // 读取玩法索引
+     const indexResult = await window.electronAPI?.invoke('read-file', indexPath)
+     if (!indexResult.success) {
+       console.log('未找到保存的玩法索引文件')
+       return
+     }
+     
+     let savedGameplays = []
+     try {
+       savedGameplays = JSON.parse(indexResult.content)
+     } catch (e) {
+       console.warn('玩法索引文件格式错误')
+       return
+     }
+     
+     console.log(`发现 ${savedGameplays.length} 个保存的玩法`)
+     
+     // 逐个加载保存的玩法
+     for (const gameplayInfo of savedGameplays) {
+       try {
+         // 检查文件是否存在
+         const fileCheck = await window.electronAPI?.invoke('read-file', gameplayInfo.filePath)
+         if (!fileCheck.success) {
+           console.warn(`玩法文件不存在: ${gameplayInfo.filePath}`)
+           continue
+         }
+         
+         // 检查是否已经加载过
+         const existingGame = gameStore.games.find(game => 
+           game.type === 'external_gameplay' && game.name === gameplayInfo.title
+         )
+         
+         if (!existingGame) {
+           // 加载玩法
+           await gameStore.loadExternalGameplay(gameplayInfo.filePath)
+           console.log(`自动加载玩法: ${gameplayInfo.title}`)
+         } else {
+           console.log(`玩法已存在，跳过: ${gameplayInfo.title}`)
+         }
+         
+       } catch (error) {
+         console.error(`加载保存的玩法失败: ${gameplayInfo.title}`, error)
+       }
+     }
+     
+   } catch (error) {
+     console.error('加载保存的玩法失败:', error)
+   }
+ }
 </script>
 
 <style scoped>
@@ -559,13 +649,32 @@ function cancelLoadGameplay() {
 
 .header {
   display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e1e8ed;
+}
+
+.custom-tip {
+  background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+  color: #2d5a2d;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid #27ae60;
+  font-size: 14px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.1);
+}
+
+.header-top {
+  display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e1e8ed;
-  flex-wrap: wrap;
-  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .header h1 {
@@ -576,6 +685,7 @@ function cancelLoadGameplay() {
 .header-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 15px;
   flex-wrap: wrap;
 }
@@ -614,39 +724,7 @@ function cancelLoadGameplay() {
   background: white;
 }
 
-.stats-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
 
-.stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
-  text-align: center;
-}
-
-.stat-card.running {
-  background: linear-gradient(135deg, #d4edda, #c3e6cb);
-}
-
-.stat-number {
-  font-size: 32px;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  color: #7f8c8d;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
 .games-container {
   background: white;
@@ -792,6 +870,36 @@ function cancelLoadGameplay() {
   background: #f1f2f6;
   padding: 2px 6px;
   border-radius: 3px;
+  font-size: 11px;
+}
+
+.device-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.device-tag {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.device-tag.required {
+  background: #e74c3c;
+  color: white;
+}
+
+.device-tag.optional {
+  background: #f39c12;
+  color: white;
+}
+
+.no-devices {
+  color: #95a5a6;
+  font-style: italic;
   font-size: 11px;
 }
 
@@ -1002,11 +1110,6 @@ function cancelLoadGameplay() {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
   .header-actions {
     justify-content: center;
   }
@@ -1017,10 +1120,6 @@ function cancelLoadGameplay() {
   
   .games-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .stats-section {
-    grid-template-columns: repeat(2, 1fr);
   }
   
   .game-header {

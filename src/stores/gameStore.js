@@ -296,6 +296,28 @@ export const useGameStore = defineStore('game', {
     },
     
     /**
+     * 更新玩法路径
+     * @param {string} title - 玩法标题
+     * @param {string} newPath - 新的文件路径
+     */
+    async updateGameplayPath(title, newPath) {
+      try {
+        const game = this.games.find(game => 
+          game.type === 'external_gameplay' && game.name === title
+        )
+        
+        if (game) {
+          this.updateGame(game.id, {
+            configPath: newPath
+          })
+          console.log(`已更新玩法路径: ${title} -> ${newPath}`)
+        }
+      } catch (error) {
+        console.error('更新玩法路径失败:', error)
+      }
+    },
+    
+    /**
      * 启动外部玩法配置
      * @param {string} filePath - 玩法文件路径
      */

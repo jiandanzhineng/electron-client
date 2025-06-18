@@ -864,6 +864,75 @@ class GameplayService {
   }
   
   /**
+   * 读取外部文件内容
+   * @param {string} filePath - 文件路径
+   * @returns {Promise<string>} 文件内容
+   */
+  async readExternalFile(filePath) {
+    try {
+      const result = await window.electronAPI.invoke('read-file', filePath)
+      if (!result.success) {
+        throw new Error(`读取文件失败: ${result.error}`)
+      }
+      return result.content
+    } catch (error) {
+      this.sendLog(`读取文件失败: ${error.message}`, 'error')
+      throw error
+    }
+  }
+  
+  /**
+   * 保存游戏状态到本地存储
+   * @param {string} key - 存储键名
+   * @param {Object} state - 状态数据
+   */
+  saveGameState(key, state) {
+    try {
+      const stateKey = `gameplay_state_${key}`
+      localStorage.setItem(stateKey, JSON.stringify(state))
+      this.sendLog(`状态已保存: ${key}`, 'info')
+    } catch (error) {
+      this.sendLog(`保存状态失败: ${error.message}`, 'error')
+      throw error
+    }
+  }
+  
+  /**
+   * 从本地存储加载游戏状态
+   * @param {string} key - 存储键名
+   * @returns {Object|null} 状态数据
+   */
+  loadGameState(key) {
+    try {
+      const stateKey = `gameplay_state_${key}`
+      const stateData = localStorage.getItem(stateKey)
+      if (stateData) {
+        const state = JSON.parse(stateData)
+        this.sendLog(`状态已加载: ${key}`, 'info')
+        return state
+      }
+      return null
+    } catch (error) {
+      this.sendLog(`加载状态失败: ${error.message}`, 'error')
+      return null
+    }
+  }
+  
+  /**
+   * 清除游戏状态
+   * @param {string} key - 存储键名
+   */
+  clearGameState(key) {
+    try {
+      const stateKey = `gameplay_state_${key}`
+      localStorage.removeItem(stateKey)
+      this.sendLog(`状态已清除: ${key}`, 'info')
+    } catch (error) {
+      this.sendLog(`清除状态失败: ${error.message}`, 'error')
+    }
+  }
+  
+  /**
    * 清理资源
    */
   cleanup() {

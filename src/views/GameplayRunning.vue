@@ -1,5 +1,13 @@
 <template>
   <div class="gameplay-running">
+    <!-- 自定义UI区域 - 外部玩法可以在这里渲染自定义界面 -->
+    <el-card v-if="customUIContent" class="custom-ui-card">
+      <template #header>
+        <h3>{{ customUITitle || '游戏界面' }}</h3>
+      </template>
+      <div class="custom-ui-container" v-html="customUIContent"></div>
+    </el-card>
+
     <el-card class="header-card">
       <template #header>
         <div class="card-header">
@@ -71,19 +79,19 @@
       </div>
     </el-card>
 
-    <!-- 控制按钮 -->
-    <div class="control-actions">
-      <el-button @click="pauseGameplay" v-if="status === 'running'" type="warning" size="large">
-        暂停玩法
+    <!-- 悬浮控制按钮 -->
+    <div class="floating-controls">
+      <el-button @click="pauseGameplay" v-if="status === 'running'" type="warning" size="small" class="floating-btn">
+        暂停
       </el-button>
-      <el-button @click="resumeGameplay" v-if="status === 'paused'" type="primary" size="large">
-        继续玩法
+      <el-button @click="resumeGameplay" v-if="status === 'paused'" type="primary" size="small" class="floating-btn">
+        继续
       </el-button>
-      <el-button @click="stopGameplay" type="danger" size="large">
-        停止玩法
+      <el-button @click="stopGameplay" type="danger" size="small" class="floating-btn">
+        停止
       </el-button>
-      <el-button @click="goBack" size="large">
-        返回列表
+      <el-button @click="goBack" size="small" class="floating-btn">
+        返回
       </el-button>
     </div>
   </div>
@@ -111,6 +119,10 @@ export default {
     const logs = ref([])
     const autoScroll = ref(true)
     const logContainer = ref(null)
+    
+    // 自定义UI相关
+    const customUIContent = ref('')
+    const customUITitle = ref('')
     
     let startTime = Date.now()
     let timer = null
@@ -236,21 +248,70 @@ export default {
       }
     }
     
-    const goBack = () => {
-      if (timer) {
-        clearInterval(timer)
+    const goBack = async () => {
+      try {
+        // 如果玩法正在运行，先停止它
+        if (status.value === 'running' || status.value === 'paused') {
+          await gameplayService.stopGameplay()
+          addLog('离开页面，自动停止玩法', 'info')
+        }
+        
+        if (timer) {
+          clearInterval(timer)
+          timer = null
+        }
+        
+        // 清除会话存储
+        sessionStorage.removeItem('runningGameplay')
+        
+        // 直接跳转，不延迟
+        router.push('/games')
+      } catch (error) {
+        addLog(`停止玩法失败: ${error.message}`, 'error')
+        // 即使停止失败也要跳转
+        router.push('/games')
       }
-      router.push('/games')
+    }
+    
+    // 更新自定义UI内容
+    const updateCustomUI = (content, title = '') => {
+      customUIContent.value = content
+      customUITitle.value = title
+    }
+    
+    // 处理自定义UI事件
+    const handleCustomUIEvent = (eventType, data) => {
+      // 将事件传递给当前运行的玩法
+      if (gameplayService.currentGameplay && gameplayService.currentGameplay.handleUIEvent) {
+        gameplayService.currentGameplay.handleUIEvent(eventType, data)
+      }
+    }
+    
+    // 暴露方法给全局，供外部玩法调用
+    const exposeUIAPI = () => {
+      window.gameplayUI = {
+        updateUI: updateCustomUI,
+        addLog: addLog,
+        handleEvent: handleCustomUIEvent
+      }
+      
+      // 暴露gameplayService给外部玩法使用
+      window.gameplayService = gameplayService
     }
     
     onMounted(async () => {
+      // 暴露UI API
+      exposeUIAPI()
+      
       // 获取玩法信息
       const runningGameplay = sessionStorage.getItem('runningGameplay')
+      let gameplayData = null
+      
       if (runningGameplay) {
-        const data = JSON.parse(runningGameplay)
-        gameplayInfo.value = data.config
-        deviceMapping.value = data.deviceMapping
-        currentParameters.value = data.parameters
+        gameplayData = JSON.parse(runningGameplay)
+        gameplayInfo.value = gameplayData.config
+        deviceMapping.value = gameplayData.deviceMapping
+        currentParameters.value = gameplayData.parameters
       } else {
         addLog('未找到运行中的玩法信息', 'error')
         router.push('/games')
@@ -281,19 +342,21 @@ export default {
       try {
         addLog('正在启动外部玩法...', 'info')
         
-        // 从sessionStorage获取玩法文件路径（这里需要根据实际情况调整）
-        const gameplayFilePath = 'e:\\develop\\electron-client\\outter-game\\simple-lock-game.js'
+        // 从sessionStorage获取玩法文件路径
+        const gameplayFilePath = gameplayData.gameplayFilePath || gameplayData.config.filePath
+        if (!gameplayFilePath) {
+          throw new Error('未找到玩法文件路径')
+        }
         
         // 加载外部玩法
         await gameplayService.loadGameplayFromJS(gameplayFilePath)
         addLog('外部玩法加载成功', 'success')
         
         // 启动玩法
-        const data = JSON.parse(runningGameplay)
         await gameplayService.startGameplay(
-          data.config,
-          data.deviceMapping,
-          data.parameters
+          gameplayData.config,
+          gameplayData.deviceMapping,
+          gameplayData.parameters
         )
         addLog('外部玩法启动成功', 'success')
         
@@ -303,12 +366,34 @@ export default {
       }
     })
     
-    onUnmounted(() => {
+    onUnmounted(async () => {
+      try {
+        // 如果玩法正在运行，先停止它
+        if (status.value === 'running' || status.value === 'paused') {
+          await gameplayService.stopGameplay()
+          console.log('组件销毁，自动停止玩法')
+        }
+      } catch (error) {
+        console.error('组件销毁时停止玩法失败:', error)
+      }
+      
       if (timer) {
         clearInterval(timer)
       }
+      
+      // 清除会话存储
+      sessionStorage.removeItem('runningGameplay')
+      
       // 清理日志回调
       gameplayService.setLogCallback(null)
+      // 清理UI API
+      if (window.gameplayUI) {
+        delete window.gameplayUI
+      }
+      // 清理gameplayService API
+      if (window.gameplayService) {
+        delete window.gameplayService
+      }
     })
     
     return {
@@ -322,6 +407,8 @@ export default {
       logs,
       autoScroll,
       logContainer,
+      customUIContent,
+      customUITitle,
       formatTime,
       formatLogTime,
       addLog,
@@ -519,8 +606,21 @@ export default {
 }
 
 .device-name {
-  font-weight: 600;
+  font-weight: 500;
   color: #495057;
+}
+
+/* 自定义UI区域样式 */
+.custom-ui-card {
+  margin-bottom: 20px;
+}
+
+.custom-ui-container {
+  min-height: 200px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 2px dashed #dee2e6;
 }
 
 .log-card-full {
@@ -663,33 +763,39 @@ export default {
   color: #6c757d;
 }
 
-.control-actions {
-  text-align: center;
-  padding: 24px;
+.floating-controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
   transition: all 0.3s ease;
 }
 
-.control-actions:hover {
+.floating-controls:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.2);
 }
 
-.control-actions .el-button {
-  margin: 0 12px;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.floating-btn {
+  min-width: 60px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 16px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
-.control-actions .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+.floating-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* 响应式设计 */
@@ -715,12 +821,15 @@ export default {
     height: 400px;
   }
   
-  .control-actions {
-    flex-direction: column;
+  .floating-controls {
+    top: 10px;
+    right: 10px;
+    padding: 8px 12px;
+    gap: 6px;
   }
   
-  .control-actions .el-button {
-    width: 100%;
+  .floating-btn {
+    min-width: 50px !important;
   }
 }
 
@@ -757,8 +866,9 @@ export default {
     color: #e2e8f0;
   }
   
-  .control-actions {
-    background: rgba(45, 55, 72, 0.9);
+  .floating-controls {
+    background: rgba(45, 55, 72, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
 </style>
