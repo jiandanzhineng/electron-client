@@ -514,9 +514,11 @@ class QAGame {
       this.log(`执行电击惩罚 - 强度: ${intensity}, 持续: ${duration}秒`, 'warning')
       
       // 发送电击命令
-      await this.deviceManager.setDeviceProperty('shock_device', 'intensity', intensity)
-      await this.deviceManager.setDeviceProperty('shock_device', 'duration', duration * 1000)
-      await this.deviceManager.setDeviceProperty('shock_device', 'active', 1)
+      await this.deviceManager.setDeviceProperty('shock_device', {
+        intensity: intensity,
+        duration: duration * 1000,
+        active: 1
+      })
       
       this.log('电击惩罚执行完成', 'info')
       

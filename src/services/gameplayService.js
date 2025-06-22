@@ -156,11 +156,14 @@ class DeviceManager {
         const cacheKey = `${logicalId}`
         const previousData = this.devicePropertyCache.get(cacheKey) || {}
         
+        // 合并之前的数据和新数据，确保保留所有属性
+        const mergedData = { ...previousData, ...data }
+        
         // 检查属性变化并触发相应的回调
         this.checkPropertyChanges(logicalId, previousData, data)
         
-        // 更新属性缓存
-        this.devicePropertyCache.set(cacheKey, { ...data })
+        // 更新属性缓存，保留所有历史属性
+        this.devicePropertyCache.set(cacheKey, mergedData)
         
         // 触发通用消息回调（listenDeviceMessages）
         const callback = this.sensorCallbacks.get(logicalId)
@@ -240,10 +243,10 @@ class DeviceManager {
   /**
    * 设置设备属性
    * @param {string} logicalId - 逻辑设备ID
-   * @param {string} property - 属性名称
-   * @param {any} value - 属性值
+   * @param {Object} properties - 属性对象，键为属性名，值为属性值
+   * @returns {Promise<boolean>} - 设置是否成功
    */
-  async setDeviceProperty(logicalId, property, value) {
+  async setDeviceProperty(logicalId, properties) {
     const device = this.deviceMap.get(logicalId)
     if (!device) {
       this.sendLog(`设备未找到: ${logicalId}`, 'error')
@@ -251,12 +254,13 @@ class DeviceManager {
     }
 
     try {
-      this.sendLog(`设置设备属性: ${device.name} -> ${property} = ${value}`, 'info')
+      const propertyList = Object.entries(properties).map(([key, value]) => `${key} = ${value}`).join(', ')
+      this.sendLog(`设置设备属性: ${device.name} -> ${propertyList}`, 'info')
       
       // 构造属性更新数据
       const updateData = {
         method: 'update',
-        [property]: value
+        ...properties
       }
       
       // 发送到设备的MQTT主题
@@ -264,14 +268,14 @@ class DeviceManager {
       const result = await this.sendMqttMessage(topic, updateData)
       
       if (result) {
-        this.sendLog(`设备属性设置成功: ${device.name} -> ${property} = ${value}`, 'success')
+        this.sendLog(`设备属性设置成功: ${device.name} -> ${propertyList}`, 'success')
         return true
       } else {
-        this.sendLog(`设备属性设置失败: ${device.name} -> ${property}`, 'error')
+        this.sendLog(`设备属性设置失败: ${device.name} -> ${propertyList}`, 'error')
         return false
       }
     } catch (error) {
-      this.sendLog(`设备属性设置异常: ${device.name} -> ${property} (${error.message})`, 'error')
+      this.sendLog(`设备属性设置异常: ${device.name} (${error.message})`, 'error')
       return false
     }
   }
@@ -391,6 +395,24 @@ class DeviceManager {
     this.sensorCallbacks.clear()
     this.devicePropertyCache.clear()
   }
+  
+  /**
+   * 清理GameplayService资源
+   */
+  cleanupGameplayService() {
+    // 重置统计信息
+    this.messageStats = {
+      received: 0,
+      processed: 0,
+      avgProcessingTime: 0,
+      maxProcessingTime: 0
+    }
+    
+    // 清理设备管理器
+    if (this.deviceManager) {
+      this.deviceManager.cleanup()
+    }
+  }
 }
 
 /**
@@ -404,9 +426,17 @@ class GameplayService {
     this.isRunning = false
     this.isPaused = false
     this.gameLoopInterval = null
-    this.startTime = 0
+    this.startTime = Date.now()
     this.deviceManager = new DeviceManager(this)
     this.logCallback = null
+    
+    // MQTT消息处理统计
+    this.messageStats = {
+      received: 0,
+      processed: 0,
+      avgProcessingTime: 0,
+      maxProcessingTime: 0
+    }
     
     // 绑定方法上下文
     this.executeLoop = this.executeLoop.bind(this)
@@ -421,8 +451,75 @@ class GameplayService {
   initMqttListener() {
     if (window.electronAPI && window.electronAPI.onMqttMessage) {
       window.electronAPI.onMqttMessage((message) => {
-        this.handleMqttMessage(message)
+        this.handleMqttMessageDirect(message)
       })
+      
+      this.sendLog('MQTT消息监听已初始化，启用直接处理模式', 'info')
+    }
+  }
+  
+  /**
+   * 直接处理MQTT消息
+   * @param {Object} message - MQTT消息对象
+   */
+  handleMqttMessageDirect(message) {
+    const startTime = performance.now()
+    this.messageStats.received++
+    
+    try {
+      this.handleMqttMessage(message)
+      this.messageStats.processed++
+      
+      // 计算处理时间
+      const processingTime = performance.now() - startTime
+      this.updateProcessingStats(processingTime)
+      
+      // 解析消息内容以检查method字段
+      let logMessage = `MQTT消息处理完成: ${processingTime.toFixed(2)}ms - ${message.topic}`
+      try {
+        const payload = JSON.parse(message.payload)
+        if (payload.method && payload.method !== 'report') {
+          logMessage += ` - 消息内容: ${message.payload}`
+        }
+      } catch (e) {
+        // 解析失败时不添加消息内容
+      }
+      
+      // 记录处理时间日志
+      this.sendLog(logMessage, 'debug')
+      
+      // 如果处理时间过长，记录警告
+      if (processingTime > 10) {
+        this.sendLog(`MQTT消息处理耗时较长: ${processingTime.toFixed(2)}ms - ${message.topic}`, 'warning')
+      }
+      
+    } catch (error) {
+      this.sendLog(`处理MQTT消息失败: ${error.message} - ${message.topic}`, 'error')
+    }
+  }
+  
+
+  
+  /**
+   * 更新处理性能统计
+   */
+  updateProcessingStats(processingTime) {
+    this.messageStats.maxProcessingTime = Math.max(this.messageStats.maxProcessingTime, processingTime)
+    
+    // 计算移动平均值
+    const alpha = 0.1 // 平滑因子
+    this.messageStats.avgProcessingTime = 
+      this.messageStats.avgProcessingTime * (1 - alpha) + processingTime * alpha
+  }
+  
+  /**
+   * 获取MQTT处理统计信息
+   */
+  getMqttStats() {
+    return {
+      ...this.messageStats,
+      queueLength: this.messageQueue.length,
+      processingRate: this.messageStats.processed / Math.max((Date.now() - this.startTime) / 1000, 1)
     }
   }
   
@@ -440,6 +537,14 @@ class GameplayService {
       
       const deviceId = topicMatch[1]
       
+      // 检查设备是否已映射到当前玩法
+      const isMappedDevice = Array.from(this.deviceManager.deviceMap.values())
+        .some(device => device.id === deviceId)
+      
+      if (!isMappedDevice) {
+        return // 设备未映射到当前玩法，忽略消息
+      }
+      
       // 解析消息内容
       let payload
       try {
@@ -448,14 +553,25 @@ class GameplayService {
         return // 解析失败，忽略
       }
       
-      // 检查是否是report方法
-      if (payload.method !== 'report') {
-        return // 不是上报消息，忽略
+      // 检查是否存在method字段
+      if (!payload.hasOwnProperty('method')) {
+        return // 没有method字段，忽略
       }
       
-      // 移除method字段，只保留设备数据
-      const deviceData = { ...payload }
-      delete deviceData.method
+      // 处理不同格式的消息
+      let deviceData
+      
+      if (payload.method === 'update' && payload.hasOwnProperty('key') && payload.hasOwnProperty('value')) {
+        // 处理 key-value 格式的消息: {"method":"update","key":"button1","value":0}
+        deviceData = {
+          [payload.key]: payload.value
+        }
+        this.sendLog(`转换key-value格式消息: ${payload.key} = ${payload.value}`, 'debug')
+      } else {
+        // 处理其他格式的消息，移除method字段，只保留设备数据
+        deviceData = { ...payload }
+        delete deviceData.method
+      }
       
       // 将消息传递给DeviceManager处理
       this.deviceManager.handleSensorData(deviceId, deviceData)
@@ -594,8 +710,27 @@ class GameplayService {
     }
     
     try {
-      // 映射设备
-      this.deviceManager.mapDevices(requiredDevices)
+      // 验证用户映射的设备是否满足玩法需求
+       for (const deviceReq of requiredDevices) {
+         if (deviceReq.required) {
+           const mappedDevice = this.deviceManager.deviceMap.get(deviceReq.logicalId)
+           if (!mappedDevice) {
+             const errorMsg = `必需的设备未映射: ${deviceReq.name || deviceReq.logicalId}`
+             this.sendLog(errorMsg, 'error')
+             throw new Error(errorMsg)
+           }
+           
+           // 验证设备是否在线
+           if (!mappedDevice.connected) {
+             const errorMsg = `必需的设备离线: ${mappedDevice.name} (${deviceReq.logicalId})`
+             this.sendLog(errorMsg, 'error')
+             throw new Error(errorMsg)
+           }
+           
+           this.sendLog(`设备验证通过: ${deviceReq.logicalId} -> ${mappedDevice.name}`, 'success')
+         }
+       }
+      
       console.log('设备依赖验证通过')
     } catch (error) {
       console.error('设备依赖验证失败:', error)
@@ -799,6 +934,10 @@ class GameplayService {
         await this.currentGameplay.end(this.deviceManager)
       }
       
+      // 清理设备管理器监听器
+      this.deviceManager.cleanup()
+      this.sendLog('设备监听器已清理', 'info')
+      
       this.isRunning = false
       this.isPaused = false
       
@@ -817,6 +956,30 @@ class GameplayService {
    */
   applyDeviceMapping(deviceMapping) {
     this.deviceMapping = deviceMapping
+    
+    // 清空现有的设备映射
+    this.deviceManager.deviceMap.clear()
+    
+    // 初始化设备存储
+    const store = this.deviceManager.initDeviceStore()
+    
+    this.sendLog('开始应用用户设备映射...', 'info')
+    
+    // 根据用户映射建立 deviceMap
+    for (const [logicalId, deviceId] of Object.entries(deviceMapping)) {
+      if (deviceId) {
+        // 查找对应的设备
+        const device = store.devices.find(d => d.id === deviceId)
+        if (device) {
+          this.deviceManager.deviceMap.set(logicalId, device)
+          this.sendLog(`设备映射成功: ${logicalId} -> ${device.name} (${deviceId})`, 'success')
+        } else {
+          this.sendLog(`设备映射失败: ${logicalId} -> 设备 ${deviceId} 未找到`, 'error')
+        }
+      }
+    }
+    
+    this.sendLog(`用户设备映射完成，共映射 ${this.deviceManager.deviceMap.size} 个设备`, 'success')
     console.log('设备映射已应用:', deviceMapping)
   }
   

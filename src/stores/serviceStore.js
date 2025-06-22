@@ -19,7 +19,8 @@ export const useServiceStore = defineStore('service', {
       password: ''
     },
     mqttConnected: false,
-    mqttClient: null
+    mqttClient: null,
+    isInitialized: false
   }),
 
   getters: {
@@ -352,6 +353,12 @@ export const useServiceStore = defineStore('service', {
 
     // 初始化服务状态监听器
     init() {
+      // 防止重复初始化
+      if (this.isInitialized || !window.electronAPI) {
+        return
+      }
+      this.isInitialized = true
+      
       if (window.electronAPI) {
         // 监听MDNS状态变化
         window.electronAPI.onMDNSStatusChange((status) => {

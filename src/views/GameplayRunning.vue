@@ -40,7 +40,10 @@
             <div class="device-list">
               <div v-for="(deviceId, logicalId) in deviceMapping" :key="logicalId" class="device-item">
                 <div class="device-info">
-                  <span class="device-name">{{ getDeviceName(logicalId) }}</span>
+                  <div class="device-name-container">
+                    <span class="device-name">{{ getDeviceName(logicalId) }}</span>
+                    <span class="device-id">(ID: {{ deviceId }})</span>
+                  </div>
                   <el-tag :type="getDeviceStatus(deviceId) === 'online' ? 'success' : 'danger'" size="small">
                     {{ getDeviceStatus(deviceId) === 'online' ? '在线' : '离线' }}
                   </el-tag>
@@ -162,6 +165,11 @@ export default {
     }
     
     const addLog = (message, level = 'info') => {
+      // 过滤debug级别的日志
+      if (level === 'debug') {
+        return
+      }
+      
       logs.value.push({
         timestamp: Date.now(),
         level,
@@ -605,9 +613,21 @@ export default {
   align-items: center;
 }
 
+.device-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .device-name {
   font-weight: 500;
   color: #495057;
+}
+
+.device-id {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 400;
 }
 
 /* 自定义UI区域样式 */
@@ -854,6 +874,10 @@ export default {
   
   .device-name {
     color: #e2e8f0;
+  }
+  
+  .device-id {
+    color: #a0aec0;
   }
   
   .log-container {

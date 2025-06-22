@@ -172,7 +172,11 @@ export default {
       // 初始化设备映射
       if (config.value.requiredDevices) {
         config.value.requiredDevices.forEach(device => {
-          deviceMapping.value[device.id || device.logicalId] = ''
+          const deviceId = device.id || device.logicalId
+          // 获取该设备类型的可用设备列表
+          const availableDevices = getAvailableDevices(device.type)
+          // 默认选择第一个可用的同类型设备
+          deviceMapping.value[deviceId] = availableDevices.length > 0 ? availableDevices[0].id : ''
         })
       }
       

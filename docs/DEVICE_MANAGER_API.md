@@ -8,16 +8,22 @@
 
 ```javascript
 // 设置设备属性
-const success = await this.deviceManager.setDeviceProperty(logicalId, property, value)
+const success = await this.deviceManager.setDeviceProperty(logicalId, properties)
 
 // 示例：设置自动锁的open属性为0（锁定）
-const success = await this.deviceManager.setDeviceProperty('auto_lock', 'open', 0)
+const success = await this.deviceManager.setDeviceProperty('auto_lock', { open: 0 })
+
+// 示例：同时设置多个属性
+const success = await this.deviceManager.setDeviceProperty('shock_device', {
+  voltage: 80,
+  shock: 1,
+  duration: 5000
+})
 ```
 
 **参数说明：**
 - `logicalId`: 逻辑设备ID
-- `property`: 属性名称
-- `value`: 属性值
+- `properties`: 属性对象，包含要设置的属性键值对
 
 **返回值：** `boolean` - 设置是否成功
 
@@ -141,8 +147,7 @@ async start(deviceManager, params) {
   // 3. 设置设备属性（锁定）
   const success = await this.deviceManager.setDeviceProperty(
     this.targetDevice,
-    'open',
-    0
+    { open: 0 }
   )
   
   if (success) {
@@ -165,7 +170,7 @@ async loop(deviceManager) {
 
 async end(deviceManager) {
   // 6. 解锁设备
-  await this.deviceManager.setDeviceProperty(this.targetDevice, 'open', 1)
+  await this.deviceManager.setDeviceProperty(this.targetDevice, { open: 1 })
   
   // 7. 发送游戏结束消息
   await this.deviceManager.sendDeviceMqttMessage(this.targetDevice, {
