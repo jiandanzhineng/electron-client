@@ -80,11 +80,15 @@
         </div>
 
         <!-- API服务 -->
-        <div class="service-card">
+        <div class="service-card api-service-card">
           <div class="service-header">
             <div class="service-info">
               <h3>API服务</h3>
               <p>RESTful API和Web界面</p>
+              <div class="development-notice">
+                <span class="notice-badge">🚧 开发中</span>
+                <span class="notice-text">该功能正在开发中，暂时无法使用</span>
+              </div>
             </div>
             <div class="service-status">
               <span :class="['status-indicator', serviceStore.serviceStatus.api]">
@@ -692,5 +696,67 @@ function getLevelText(level) {
 .btn-sm {
   padding: 6px 12px;
   font-size: 12px;
+}
+
+/* API服务开发中样式 */
+.api-service-card {
+  position: relative;
+  opacity: 0.8;
+}
+
+.api-service-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255, 193, 7, 0.1) 10px,
+    rgba(255, 193, 7, 0.1) 20px
+  );
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+.development-notice {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notice-badge {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+  color: #333;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notice-text {
+  color: #f39c12;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.api-service-card .service-actions button {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.api-service-card .service-config input,
+.api-service-card .service-config select {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

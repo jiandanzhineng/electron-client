@@ -218,6 +218,26 @@ class IPCHandlers {
       }
     });
 
+    // 获取应用路径处理器
+    ipcMain.handle('get-app-paths', async () => {
+      try {
+        const { app } = require('electron');
+        const appPath = app.getAppPath();
+        const resourcesPath = process.resourcesPath;
+        
+        console.log('应用路径:', appPath);
+        console.log('资源路径:', resourcesPath);
+        
+        return {
+          appPath: appPath,
+          resourcesPath: resourcesPath
+        };
+      } catch (error) {
+        console.error('获取应用路径失败:', error);
+        throw error;
+      }
+    });
+
     // 写入文件内容
     ipcMain.handle('write-file', async (event, { filePath, content }) => {
       const fs = require('fs').promises;

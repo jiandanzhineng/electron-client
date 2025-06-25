@@ -47,8 +47,8 @@ function createWindow() {
   } else {
     // 加载构建后的文件
     mainWindow.loadFile('dist/index.html')
-    // 如果需要调试生产环境，可以取消下面这行的注释
-    mainWindow.webContents.openDevTools()
+    // 生产模式下默认不打开开发者工具
+    // mainWindow.webContents.openDevTools()
   }
 
   // 当window被关闭时，触发下面的事件

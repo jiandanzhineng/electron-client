@@ -60,59 +60,162 @@ export const useGameStore = defineStore('game', {
   },
 
   actions: {
-    // 初始化游戏列表
-    initGameList() {
+    // 初始化游戏商店
+    async init() {
+      this.loadGames()
+      if (this.games.length === 0) {
+        await this.loadDefaultGames()
+      }
+    },
+
+    // 加载游戏列表
+    loadGames() {
       const savedGames = localStorage.getItem('games')
       if (savedGames) {
         try {
           this.games = JSON.parse(savedGames)
         } catch (error) {
           console.error('Failed to load games from localStorage:', error)
-          this.loadDefaultGames()
+          this.games = []
         }
       } else {
-        this.loadDefaultGames()
+        this.games = []
       }
     },
 
     // 加载默认游戏列表
-    loadDefaultGames() {
-      this.games = [
-        {
-          id: 'puzzle-1',
-          name: '数字拼图',
-          description: '经典的数字滑块拼图游戏',
-          category: 'puzzle',
-          status: 'idle',
-          players: 1,
-          difficulty: 'easy',
-          createdAt: Date.now(),
-          lastPlayed: null
-        },
-        {
-          id: 'action-1',
-          name: '反应测试',
-          description: '测试你的反应速度',
-          category: 'action',
-          status: 'idle',
-          players: 1,
-          difficulty: 'medium',
-          createdAt: Date.now(),
-          lastPlayed: null
-        },
-        {
-          id: 'multiplayer-1',
-          name: '多人问答',
-          description: '支持多人同时参与的问答游戏',
-          category: 'multiplayer',
-          status: 'idle',
-          players: 4,
-          difficulty: 'medium',
+    async loadDefaultGames() {
+      this.games = []
+      
+      // 动态加载内置外部玩法
+      await this.loadBuiltinGameplays()
+      
+      this.saveGames()
+    },
+    
+    /**
+     * 加载内置的外部玩法文件
+     */
+    async loadBuiltinGameplays() {
+      const builtinGameplays = [
+        'simple-lock-game.js',
+        'shock-punishment.js',
+        'QA-game/qa-game.js',
+        'maid-punishment-game/maid-punishment-game.js'
+      ]
+      
+      for (const gameplayPath of builtinGameplays) {
+        try {
+          await this.loadBuiltinGameplay(gameplayPath)
+        } catch (error) {
+          console.warn(`加载内置玩法失败: ${gameplayPath}`, error)
+          // 加载失败时跳过，不影响其他玩法的加载
+        }
+      }
+    },
+    
+    /**
+     * 加载单个内置玩法
+     * @param {string} relativePath - 相对于outter-game目录的路径
+     */
+    async loadBuiltinGameplay(relativePath) {
+      try {
+        // 获取应用路径信息
+        const pathInfo = await this.getAppPath()
+        
+        // 根据环境选择正确的路径
+        let gameplayPath
+        if (import.meta.env.DEV) {
+          // 开发环境：直接从项目目录加载
+          gameplayPath = `${pathInfo.appPath}/outter-game/${relativePath}`
+        } else {
+          // 生产环境：从extraResources加载
+          gameplayPath = `${pathInfo.resourcesPath}/outter-game/${relativePath}`
+        }
+        
+        console.log(`尝试加载内置玩法: ${gameplayPath}`)
+        
+        // 通过gameplayService加载玩法配置
+        const config = await this.gameplayService.loadGameplayFromJS(gameplayPath)
+        
+        if (!config) {
+          throw new Error('加载玩法配置失败')
+        }
+        
+        // 生成游戏ID
+        const gameId = this.generateGameIdFromPath(relativePath)
+        
+        // 检查是否已存在同ID的游戏
+        const existingGame = this.games.find(game => game.id === gameId)
+        if (existingGame) {
+          console.log(`跳过已存在的玩法: ${config.title}`)
+          return
+        }
+        
+        // 创建游戏配置
+        const gameData = {
+          id: gameId,
+          name: config.title,
+          description: config.description,
+          category: 'external',
+          type: 'external_gameplay',
+          status: 'stopped',
+          configPath: gameplayPath,
+          version: config.version || '1.0.0',
+          author: config.author || '未知作者',
+          requiredDevices: config.requiredDevices || [],
           createdAt: Date.now(),
           lastPlayed: null
         }
-      ]
-      this.saveGames()
+        
+        this.games.push(gameData)
+        console.log(`成功加载内置玩法: ${config.title}`)
+        
+      } catch (error) {
+        console.error(`加载内置玩法失败 ${relativePath}:`, error)
+        throw error
+      }
+    },
+    
+    /**
+     * 获取应用路径（兼容开发和打包环境）
+     */
+    async getAppPath() {
+      try {
+        // 通过IPC获取应用路径和资源路径
+        const pathInfo = await window.electronAPI?.invoke('get-app-paths')
+        if (pathInfo) {
+          return pathInfo
+        }
+      } catch (error) {
+        console.warn('无法通过IPC获取应用路径，使用默认路径')
+      }
+      
+      // 开发环境下的默认路径
+      if (import.meta.env.DEV) {
+        return {
+          appPath: 'e:/develop/electron-client',
+          resourcesPath: 'e:/develop/electron-client'
+        }
+      }
+      
+      // 生产环境下的默认路径（相对于应用安装目录）
+      return {
+        appPath: './',
+        resourcesPath: './'
+      }
+    },
+    
+    /**
+     * 从路径生成游戏ID
+     * @param {string} path - 玩法文件路径
+     */
+    generateGameIdFromPath(path) {
+      return path
+        .replace(/\.js$/, '')
+        .replace(/\//g, '-')
+        .replace(/\\/g, '-')
+        .toLowerCase()
     },
 
     // 添加游戏

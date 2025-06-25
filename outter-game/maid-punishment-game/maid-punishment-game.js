@@ -10,6 +10,14 @@ export class MaidPunishmentGame {
     this.version = "1.2.0"
     this.author = "游戏设计师"
     
+    // 当前配置的参数值
+    this.config = {
+      duration: 30,
+      shockIntensity: 60,
+      progressiveIntensity: true,
+      maxIntensityIncrease: 20
+    }
+    
     // 游戏状态
     this.state = {
       startTime: 0,
@@ -68,9 +76,9 @@ export class MaidPunishmentGame {
       duration: {
         name: '游戏时长',
         type: 'number',
-        min: 5,
+        min: 1,
         max: 180,
-        step: 5,
+        step: 1,
         default: 30,
         description: '游戏持续时间（分钟）'
       },
@@ -107,15 +115,12 @@ export class MaidPunishmentGame {
    */
   updateParameters(newParams) {
     for (const [key, value] of Object.entries(newParams)) {
-      if (this.parameters[key]) {
-        if (typeof this.parameters[key] === 'object' && this.parameters[key].default !== undefined) {
-          this.parameters[key].default = value
-        } else {
-          this.parameters[key] = value
-        }
+      if (this.config.hasOwnProperty(key)) {
+        this.config[key] = value
       }
     }
     console.log('女仆惩罚游戏参数已更新:', newParams)
+    console.log('当前配置:', this.config)
   }
   
   /**
@@ -164,7 +169,7 @@ export class MaidPunishmentGame {
       // 渲染初始UI
       this.renderUI()
       
-      this.log(`女仆惩罚游戏启动成功，游戏时长: ${this.parameters.duration.default}分钟`, 'success')
+      this.log(`女仆惩罚游戏启动成功，游戏时长: ${this.config.duration}分钟`, 'success')
       this.log('请保持踮脚站立，脚后跟不要压下按钮！', 'warning')
       
     } catch (error) {
@@ -224,13 +229,13 @@ export class MaidPunishmentGame {
     }
     
     try {
-      let intensity = this.parameters.shockIntensity.default
+      let intensity = this.config.shockIntensity
       
       // 渐进式强度计算
-      if (this.parameters.progressiveIntensity.default) {
+      if (this.config.progressiveIntensity) {
         const intensityIncrease = Math.min(
           this.state.shockCount * 5,
-          this.parameters.maxIntensityIncrease.default
+          this.config.maxIntensityIncrease
         )
         intensity = Math.min(intensity + intensityIncrease, 100)
       }
@@ -318,7 +323,7 @@ export class MaidPunishmentGame {
    * 启动游戏计时器
    */
   startGameTimer() {
-    const duration = this.parameters.duration.default * 60 * 1000
+    const duration = this.config.duration * 60 * 1000
     
     this.gameTimer = setTimeout(async () => {
       await this.endGame()
@@ -354,7 +359,7 @@ export class MaidPunishmentGame {
     }
     
     const elapsed = Date.now() - this.state.startTime
-    const duration = this.parameters.duration.default * 60 * 1000
+    const duration = this.config.duration * 60 * 1000
     const remaining = duration - elapsed
     
     if (remaining <= 0) {
@@ -372,7 +377,7 @@ export class MaidPunishmentGame {
     if (!this.uiAPI) return
     
     const elapsed = Date.now() - this.state.startTime
-    const duration = this.parameters.duration.default * 60 * 1000
+    const duration = this.config.duration * 60 * 1000
     const remaining = Math.max(0, duration - elapsed)
     
     const remainingMinutes = Math.floor(remaining / 60000)

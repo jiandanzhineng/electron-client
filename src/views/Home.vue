@@ -4,6 +4,19 @@
     <p>官方网站 easysmart.top 支持nodejs python开发更多可用程序</p>
     
     <div class="info-grid">
+      <div class="info-card documentation-card">
+        <h3>📚 项目文档</h3>
+        <p>
+          详细的使用文档和开发指南请访问：
+          <br>
+          <a href="https://easysmart.top" target="_blank" rel="noopener noreferrer" @click="openInBrowser" class="doc-link">
+            🌐 easysmart.top
+          </a>
+          <br>
+          <small>包含API文档、设备配置、游戏开发等完整教程</small>
+        </p>
+      </div>
+      
       <div class="info-card">
         <h3>🚀 交流QQ群</h3>
         <p>970326066 欢迎大家交流使用心得 开发更多玩法</p>
@@ -84,10 +97,10 @@ const openInBrowser = async (event) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 初始化各个store
   deviceStore.initDeviceList()
-  gameStore.initGameList()
+  await gameStore.init()
 })
 </script>
 
@@ -217,5 +230,102 @@ onMounted(() => {
 
 .action-btn:active {
   transform: translateY(0);
+}
+
+/* 文档说明框特殊样式 */
+.documentation-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+}
+
+.documentation-card h3 {
+  color: white;
+  margin-bottom: 15px;
+}
+
+.documentation-card p {
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.8;
+}
+
+.doc-link {
+  color: #ffd700;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 18px;
+  display: inline-block;
+  margin: 8px 0;
+  transition: all 0.3s ease;
+}
+
+.doc-link:hover {
+  color: #ffed4e;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  transform: scale(1.05);
+}
+
+.documentation-card small {
+  color: rgba(255, 255, 255, 0.8);
+  font-style: italic;
+}
+
+/* QQ群卡片特殊样式 */
+.info-card:nth-child(2) {
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+  color: white;
+  border: none;
+}
+
+.info-card:nth-child(2) h3 {
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-card:nth-child(2) p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* 淘宝店铺卡片特殊样式 */
+.info-card:nth-child(3) {
+  background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+  color: white;
+  border: none;
+}
+
+.info-card:nth-child(3) h3 {
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-card:nth-child(3) p {
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+}
+
+.info-card:nth-child(3) a {
+  color: #ffd700;
+  text-decoration: none;
+  font-weight: bold;
+  display: inline-block;
+  margin: 8px 0;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.info-card:nth-child(3) a:hover {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: #ffd700;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
 }
 </style>
