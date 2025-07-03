@@ -71,7 +71,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
-  onAutoUpdaterStatus: (callback) => ipcRenderer.on('auto-updater-status', (event, status) => callback(status))
+  onAutoUpdaterStatus: (callback) => ipcRenderer.on('auto-updater-status', (event, status) => callback(status)),
+  
+  // 玩法文件管理相关API
+  scanGameplayDirectory: (directoryPath) => ipcRenderer.invoke('scan-gameplay-directory', directoryPath),
+  copyGameplayFile: (sourcePath, targetPath) => ipcRenderer.invoke('copy-gameplay-file', sourcePath, targetPath)
 });
 
 console.log('Preload script executed');

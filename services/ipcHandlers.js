@@ -298,6 +298,67 @@ class IPCHandlers {
       }
     });
 
+    // 扫描玩法目录获取所有JS文件
+    ipcMain.handle('scan-gameplay-directory', async (event, directoryPath) => {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      try {
+        const files = [];
+        
+        // 递归扫描目录
+        async function scanDirectory(dir) {
+          try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              
+              if (entry.isDirectory()) {
+                // 递归扫描子目录
+                await scanDirectory(fullPath);
+              } else if (entry.isFile() && entry.name.endsWith('.js')) {
+                // 添加JS文件到列表
+                files.push(fullPath);
+              }
+            }
+          } catch (error) {
+            // 忽略无法访问的目录
+            console.warn(`无法访问目录: ${dir}`, error.message);
+          }
+        }
+        
+        await scanDirectory(directoryPath);
+        
+        logger.info(`扫描玩法目录完成: ${directoryPath}, 找到 ${files.length} 个JS文件`, 'ipc');
+        return files;
+      } catch (error) {
+        logger.error('扫描玩法目录失败', 'ipc', error);
+        return [];
+      }
+    });
+
+    // 复制玩法文件到目标位置
+    ipcMain.handle('copy-gameplay-file', async (event, sourcePath, targetPath) => {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      try {
+        // 确保目标目录存在
+        const targetDir = path.dirname(targetPath);
+        await fs.mkdir(targetDir, { recursive: true });
+        
+        // 复制文件
+        await fs.copyFile(sourcePath, targetPath);
+        
+        logger.info(`玩法文件复制成功: ${sourcePath} -> ${targetPath}`, 'ipc');
+        return { success: true, targetPath };
+      } catch (error) {
+        logger.error('复制玩法文件失败', 'ipc', error);
+        throw error;
+      }
+    });
+
     // 清理旧日志
     ipcMain.handle('clean-old-logs', async (event) => {
       try {

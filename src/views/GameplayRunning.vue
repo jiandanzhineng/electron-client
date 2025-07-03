@@ -245,6 +245,8 @@ export default {
           clearInterval(timer)
           timer = null
         }
+        // 重置首次启动标志，为下次游戏做准备
+        isFirstGameStart = true
         // 清除会话存储
         sessionStorage.removeItem('runningGameplay')
         // 延迟跳转，让用户看到停止日志
@@ -264,6 +266,9 @@ export default {
           addLog('离开页面，自动停止玩法', 'info')
         }
         
+        // 重置首次启动标志
+        isFirstGameStart = true
+        
         if (timer) {
           clearInterval(timer)
           timer = null
@@ -281,10 +286,41 @@ export default {
       }
     }
     
+    // 标记是否为游戏首次启动
+    let isFirstGameStart = true
+    
     // 更新自定义UI内容
     const updateCustomUI = (content, title = '') => {
       customUIContent.value = content
       customUITitle.value = title
+      
+      // 只在游戏首次启动时滚动到顶部
+      if (isFirstGameStart && content && content.trim() !== '') {
+        isFirstGameStart = false
+        nextTick(() => {
+          // 多种滚动方法确保兼容性
+          setTimeout(() => {
+            // 方法1: 使用window.scrollTo
+            if (window.scrollTo) {
+              window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+            }
+            
+            // 方法2: 直接设置scrollTop
+            if (document.documentElement) {
+              document.documentElement.scrollTop = 0
+            }
+            if (document.body) {
+              document.body.scrollTop = 0
+            }
+            
+            // 方法3: 滚动到自定义UI卡片
+            const customCard = document.querySelector('.custom-ui-card')
+            if (customCard) {
+              customCard.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          }, 100)
+        })
+      }
     }
     
     // 处理自定义UI事件

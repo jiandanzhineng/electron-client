@@ -87,62 +87,80 @@ export const useGameStore = defineStore('game', {
     async loadDefaultGames() {
       this.games = []
       
-      // 动态加载内置外部玩法
-      await this.loadBuiltinGameplays()
+      // 动态加载outter-game目录下的所有玩法
+      await this.loadAllGameplaysFromDirectory()
       
       this.saveGames()
     },
     
     /**
-     * 加载内置的外部玩法文件
+     * 从outter-game目录加载所有玩法文件
      */
-    async loadBuiltinGameplays() {
-      const builtinGameplays = [
-        'simple-lock-game.js',
-        'shock-punishment.js',
-        'QA-game/qa-game.js',
-        'maid-punishment-game/maid-punishment-game.js'
-      ]
-      
-      for (const gameplayPath of builtinGameplays) {
-        try {
-          await this.loadBuiltinGameplay(gameplayPath)
-        } catch (error) {
-          console.warn(`加载内置玩法失败: ${gameplayPath}`, error)
-          // 加载失败时跳过，不影响其他玩法的加载
-        }
-      }
-    },
-    
-    /**
-     * 加载单个内置玩法
-     * @param {string} relativePath - 相对于outter-game目录的路径
-     */
-    async loadBuiltinGameplay(relativePath) {
+    async loadAllGameplaysFromDirectory() {
       try {
         // 获取应用路径信息
         const pathInfo = await this.getAppPath()
         
         // 根据环境选择正确的路径
-        let gameplayPath
+        let outterGamePath
         if (import.meta.env.DEV) {
           // 开发环境：直接从项目目录加载
-          gameplayPath = `${pathInfo.appPath}/outter-game/${relativePath}`
+          outterGamePath = `${pathInfo.appPath}/outter-game`
         } else {
           // 生产环境：从extraResources加载
-          gameplayPath = `${pathInfo.resourcesPath}/outter-game/${relativePath}`
+          outterGamePath = `${pathInfo.resourcesPath}/outter-game`
         }
         
-        console.log(`尝试加载内置玩法: ${gameplayPath}`)
+        console.log(`扫描玩法目录: ${outterGamePath}`)
+        
+        // 通过IPC获取目录下的所有JS文件
+        const gameplayFiles = await this.scanGameplayDirectory(outterGamePath)
+        
+        for (const filePath of gameplayFiles) {
+          try {
+            await this.loadGameplayFromFile(filePath)
+          } catch (error) {
+            console.warn(`加载玩法失败: ${filePath}`, error)
+            // 加载失败时跳过，不影响其他玩法的加载
+          }
+        }
+      } catch (error) {
+        console.error('扫描玩法目录失败:', error)
+      }
+    },
+    
+    /**
+     * 扫描玩法目录获取所有JS文件
+     * @param {string} directoryPath - 目录路径
+     */
+    async scanGameplayDirectory(directoryPath) {
+      try {
+        // 通过IPC调用主进程扫描目录
+        const files = await window.electronAPI?.scanGameplayDirectory(directoryPath)
+        return files || []
+      } catch (error) {
+        console.error('扫描玩法目录失败:', error)
+        return []
+      }
+    },
+    
+    /**
+     * 从文件路径加载玩法
+     * @param {string} filePath - 玩法文件的完整路径
+     */
+    async loadGameplayFromFile(filePath) {
+      try {
+        console.log(`尝试加载玩法: ${filePath}`)
         
         // 通过gameplayService加载玩法配置
-        const config = await this.gameplayService.loadGameplayFromJS(gameplayPath)
+        const config = await this.gameplayService.loadGameplayFromJS(filePath)
         
         if (!config) {
           throw new Error('加载玩法配置失败')
         }
         
-        // 生成游戏ID
+        // 从完整路径生成相对路径用于ID生成
+        const relativePath = this.getRelativePathFromFull(filePath)
         const gameId = this.generateGameIdFromPath(relativePath)
         
         // 检查是否已存在同ID的游戏
@@ -160,7 +178,7 @@ export const useGameStore = defineStore('game', {
           category: 'external',
           type: 'external_gameplay',
           status: 'stopped',
-          configPath: gameplayPath,
+          configPath: filePath,
           version: config.version || '1.0.0',
           author: config.author || '未知作者',
           requiredDevices: config.requiredDevices || [],
@@ -169,12 +187,25 @@ export const useGameStore = defineStore('game', {
         }
         
         this.games.push(gameData)
-        console.log(`成功加载内置玩法: ${config.title}`)
+        console.log(`成功加载玩法: ${config.title}`)
         
       } catch (error) {
-        console.error(`加载内置玩法失败 ${relativePath}:`, error)
+        console.error(`加载玩法失败 ${filePath}:`, error)
         throw error
       }
+    },
+    
+    /**
+     * 从完整路径提取相对于outter-game的路径
+     * @param {string} fullPath - 完整文件路径
+     */
+    getRelativePathFromFull(fullPath) {
+      const outterGameIndex = fullPath.indexOf('outter-game')
+      if (outterGameIndex !== -1) {
+        return fullPath.substring(outterGameIndex + 'outter-game'.length + 1)
+      }
+      // 如果找不到outter-game，使用文件名
+      return fullPath.split(/[\\/]/).pop()
     },
     
     /**
@@ -347,16 +378,22 @@ export const useGameStore = defineStore('game', {
     // === 外部玩法相关方法 ===
     
     /**
-     * 加载外部玩法文件
+     * 加载外部玩法文件（复制到outter-game目录）
      * @param {string} filePath - 玩法文件路径
      */
     async loadExternalGameplay(filePath) {
       try {
         console.log('正在加载外部玩法:', filePath)
+        
+        // 首先加载配置以获取玩法信息
         const config = await this.gameplayService.loadGameplayFromJS(filePath)
         this.currentGameplayConfig = config
+        
         // 保存到 sessionStorage 以防热更新时丢失
         sessionStorage.setItem('currentGameplayConfig', JSON.stringify(config))
+        
+        // 复制文件到outter-game目录
+        const copiedFilePath = await this.copyGameplayToOutterGame(filePath, config.title)
         
         // 检查是否已经存在同名游戏
         const existingGame = this.games.find(game => 
@@ -367,7 +404,7 @@ export const useGameStore = defineStore('game', {
           // 更新现有游戏
           this.updateGame(existingGame.id, {
             description: config.description,
-            configPath: filePath,
+            configPath: copiedFilePath,
             requiredDevices: config.requiredDevices,
             version: config.version,
             author: config.author
@@ -381,7 +418,7 @@ export const useGameStore = defineStore('game', {
             category: 'external',
             type: 'external_gameplay',
             status: 'stopped',
-            configPath: filePath,
+            configPath: copiedFilePath,
             requiredDevices: config.requiredDevices,
             version: config.version || '1.0.0',
             author: config.author || '未知作者'
@@ -394,6 +431,74 @@ export const useGameStore = defineStore('game', {
         return config
       } catch (error) {
         console.error('加载外部玩法失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 复制玩法文件到outter-game目录
+     * @param {string} sourcePath - 源文件路径
+     * @param {string} gameplayTitle - 玩法标题
+     */
+    async copyGameplayToOutterGame(sourcePath, gameplayTitle) {
+      try {
+        // 获取应用路径信息
+        const pathInfo = await this.getAppPath()
+        
+        // 根据环境选择正确的目标路径
+        let outterGamePath
+        if (import.meta.env.DEV) {
+          outterGamePath = `${pathInfo.appPath}/outter-game`
+        } else {
+          outterGamePath = `${pathInfo.resourcesPath}/outter-game`
+        }
+        
+        // 生成安全的文件名
+        const safeFileName = this.generateSafeFileName(gameplayTitle)
+        const targetPath = `${outterGamePath}/${safeFileName}.js`
+        
+        // 通过IPC调用主进程复制文件
+         await window.electronAPI?.copyGameplayFile(sourcePath, targetPath)
+        
+        console.log(`玩法文件已复制到: ${targetPath}`)
+        return targetPath
+      } catch (error) {
+        console.error('复制玩法文件失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 生成安全的文件名
+     * @param {string} title - 玩法标题
+     */
+    generateSafeFileName(title) {
+      return title
+        .replace(/[^a-zA-Z0-9\u4e00-\u9fa5\-_]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_|_$/g, '')
+        .toLowerCase()
+    },
+    
+    /**
+     * 刷新玩法列表（删除旧数据，重新扫描outter-game目录）
+     */
+    async refreshGameplayList() {
+      try {
+        console.log('开始刷新玩法列表...')
+        
+        // 删除所有外部玩法类型的游戏
+        this.games = this.games.filter(game => game.type !== 'external_gameplay')
+        
+        // 重新扫描并加载outter-game目录下的所有玩法
+        await this.loadAllGameplaysFromDirectory()
+        
+        // 保存更新后的游戏列表
+        this.saveGames()
+        
+        console.log('玩法列表刷新完成')
+      } catch (error) {
+        console.error('刷新玩法列表失败:', error)
         throw error
       }
     },

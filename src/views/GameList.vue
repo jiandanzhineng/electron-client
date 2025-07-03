@@ -371,7 +371,7 @@ function removeGame(game) {
 }
 
 async function refreshGames() {
-  await gameStore.init()
+  await gameStore.refreshGameplayList()
 }
 
 function closeModal() {

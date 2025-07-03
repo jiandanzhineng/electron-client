@@ -43,52 +43,7 @@ class DeviceManager {
     return this.deviceStore
   }
 
-  /**
-   * 映射逻辑设备到实际设备
-   * @param {Array} requiredDevices - 需要的设备列表
-   */
-  mapDevices(requiredDevices) {
-    const store = this.initDeviceStore()
-    this.deviceMap.clear()
-    
-    this.sendLog('开始设备映射...', 'info')
-    
-    for (const deviceReq of requiredDevices) {
-      const actualDevice = this.findBestMatchDevice(deviceReq)
-      if (actualDevice) {
-        this.deviceMap.set(deviceReq.logicalId, actualDevice)
-        this.sendLog(`设备映射成功: ${deviceReq.name || deviceReq.logicalId} -> ${actualDevice.name}`, 'success')
-      } else if (deviceReq.required) {
-        const errorMsg = `找不到必需的设备: ${deviceReq.name || deviceReq.type}`
-        this.sendLog(errorMsg, 'error')
-        throw new Error(errorMsg)
-      } else {
-        this.sendLog(`可选设备未找到: ${deviceReq.name || deviceReq.logicalId}`, 'warning')
-      }
-    }
-    
-    this.sendLog(`设备映射完成，共映射 ${this.deviceMap.size} 个设备`, 'success')
-  }
 
-  /**
-   * 查找最佳匹配的设备
-   * @param {Object} deviceReq - 设备需求
-   */
-  findBestMatchDevice(deviceReq) {
-    const store = this.initDeviceStore()
-    
-    // 首先按类型查找
-    const devicesByType = store.devices.filter(device => 
-      device.type === deviceReq.type && device.connected === true
-    )
-    
-    if (devicesByType.length === 0) {
-      return null
-    }
-    
-    // 如果有多个同类型设备，选择第一个在线的
-    return devicesByType[0]
-  }
 
   /**
    * 执行设备动作
@@ -542,6 +497,11 @@ class GameplayService {
         .some(device => device.id === deviceId)
       
       if (!isMappedDevice) {
+        this.sendLog(`设备未映射到当前玩法: ${deviceId}`, 'debug')
+        // 展示device map
+        const mappedDevices = Array.from(this.deviceManager.deviceMap.values())
+         .map(device => device.id)
+        this.sendLog(`当前玩法已映射的设备: ${mappedDevices.join(', ')}`, 'debug')
         return // 设备未映射到当前玩法，忽略消息
       }
       
@@ -568,9 +528,7 @@ class GameplayService {
         }
         this.sendLog(`转换key-value格式消息: ${payload.key} = ${payload.value}`, 'debug')
       } else {
-        // 处理其他格式的消息，移除method字段，只保留设备数据
         deviceData = { ...payload }
-        delete deviceData.method
       }
       
       // 将消息传递给DeviceManager处理
