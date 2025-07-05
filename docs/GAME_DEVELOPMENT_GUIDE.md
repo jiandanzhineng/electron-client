@@ -141,6 +141,17 @@ async loop(deviceManager) {
 }
 ```
 
+##### end(deviceManager) - 必需
+
+```javascript
+async end(deviceManager) {
+  // 游戏结束时的清理工作
+  await this.endGame()
+}
+```
+
+**注意：** `end` 方法是供 gameplayService 调用的标准接口，用于外部停止游戏时的清理工作。该方法通常调用内部的 `endGame` 方法来执行实际的结束逻辑。
+
 ## 设备管理器 API
 
 ### 设备属性监听
@@ -508,6 +519,10 @@ export class ExampleGame {
   }
   
   async stop() {
+    await this.endGame()
+  }
+  
+  async end(deviceManager) {
     await this.endGame()
   }
   

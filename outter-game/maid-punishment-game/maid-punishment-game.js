@@ -1319,6 +1319,14 @@ export class MaidPunishmentGame {
   stop() {
     this.endGame()
   }
+  
+  /**
+   * 游戏结束方法 - 供外部调用
+   * @param {Object} deviceManager - 设备管理器
+   */
+  async end(deviceManager) {
+    await this.endGame()
+  }
 }
 
 // 默认导出

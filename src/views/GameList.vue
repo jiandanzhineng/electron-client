@@ -280,6 +280,8 @@ onMounted(async () => {
   await gameStore.init()
   // 自动加载保存在easysmart目录中的玩法
   await loadSavedGameplays()
+  // 自动刷新游戏列表
+  await refreshGames()
 })
 
 function selectGame(game) {
