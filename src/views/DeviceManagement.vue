@@ -34,10 +34,10 @@
           <table class="device-table">
             <thead>
               <tr>
-                <th>设备名称</th>
-                <th>设备ID</th>
                 <th>类型</th>
+                <th>设备ID</th>
                 <th>状态</th>
+                <th>电量</th>
                 <th>最后上报</th>
                 <th>操作</th>
               </tr>
@@ -49,12 +49,16 @@
                 :class="{ 'selected': device.id === deviceStore.selectedDeviceId }"
                 @click="selectDevice(device.id)"
               >
-                <td>{{ device.name }}</td>
-                <td>{{ device.id }}</td>
                 <td>{{ deviceStore.deviceTypeMap[device.type] || device.type }}</td>
+                <td>{{ device.id }}</td>
                 <td>
                   <span :class="['status-badge', device.connected ? 'online' : 'offline']">
                     {{ device.connected ? '在线' : '离线' }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="['battery-level', getBatteryLevelClass(device.data?.battery)]">
+                    {{ formatBattery(device.data?.battery) }}
                   </span>
                 </td>
                 <td>{{ formatLastReport(device.lastReport) }}</td>
@@ -96,6 +100,12 @@
               <div class="detail-item">
                 <label>最后上报:</label>
                 <span>{{ formatLastReport(selectedDevice.lastReport) }}</span>
+              </div>
+              <div class="detail-item">
+                <label>电量:</label>
+                <span :class="['battery-level', getBatteryLevelClass(selectedDevice.data?.battery)]">
+                  {{ formatBattery(selectedDevice.data?.battery) }}
+                </span>
               </div>
             </div>
             
@@ -350,6 +360,42 @@ function getInputType(value) {
     return 'checkbox'
   } else {
     return 'text'
+  }
+}
+
+// 格式化电量显示
+function formatBattery(battery) {
+  if (battery === undefined || battery === null) {
+    return '未知'
+  }
+  
+  // 如果是数字，显示百分比
+  if (typeof battery === 'number') {
+    return `${Math.round(battery)}%`
+  }
+  
+  // 如果是字符串，直接显示
+  return battery.toString()
+}
+
+// 获取电量等级样式类
+function getBatteryLevelClass(battery) {
+  if (battery === undefined || battery === null) {
+    return 'unknown'
+  }
+  
+  const level = typeof battery === 'number' ? battery : parseFloat(battery)
+  
+  if (isNaN(level)) {
+    return 'unknown'
+  }
+  
+  if (level <= 20) {
+    return 'low'
+  } else if (level <= 50) {
+    return 'medium'
+  } else {
+    return 'high'
   }
 }
 </script>
@@ -760,5 +806,40 @@ function getInputType(value) {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+}
+
+/* 电量显示样式 */
+.battery-level {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  min-width: 50px;
+  display: inline-block;
+}
+
+.battery-level.high {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.battery-level.medium {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.battery-level.low {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.battery-level.unknown {
+  background-color: #e2e3e5;
+  color: #6c757d;
+  border: 1px solid #d6d8db;
 }
 </style>
