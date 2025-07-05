@@ -1,18 +1,25 @@
 <template>
   <div class="app">
-    <Sidebar />
-    <main class="main-content">
+    <Sidebar v-if="showSidebar" />
+    <main class="main-content" :class="{ 'fullscreen': !showSidebar }">
       <router-view />
     </main>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Sidebar from './components/Sidebar.vue'
 import { useServiceStore } from './stores/serviceStore'
 
+const route = useRoute()
 const serviceStore = useServiceStore()
+
+// 计算是否显示侧边栏 - 在游戏运行页面时隐藏侧边栏
+const showSidebar = computed(() => {
+  return route.path !== '/gameplay-running'
+})
 
 let serverLogListener = null
 
@@ -56,5 +63,13 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   overflow-y: auto;
+  transition: all 0.3s ease;
+}
+
+.main-content.fullscreen {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 </style>

@@ -20,26 +20,49 @@
           </template>
           <div class="device-mapping">
             <div v-if="config?.requiredDevices && config.requiredDevices.length > 0">
-              <el-form :model="deviceMapping" label-width="120px">
-                <el-form-item 
+              <div class="device-list">
+                <div 
                   v-for="device in config.requiredDevices" 
                   :key="device.id || device.logicalId"
-                  :label="device.name || device.type"
+                  class="device-item"
+                  :class="{ 'required-device-item': device.required }"
                 >
-                  <el-select 
-                    v-model="deviceMapping[device.id || device.logicalId]" 
-                    placeholder="请选择设备"
-                    style="width: 100%"
-                  >
-                    <el-option 
-                      v-for="availableDevice in getAvailableDevices(device.type)" 
-                      :key="availableDevice.id"
-                      :label="`${availableDevice.name} (${availableDevice.id})`"
-                      :value="availableDevice.id"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-form>
+                  <div class="device-header">
+                    <div class="device-info">
+                      <span class="device-name">{{ device.name || device.type }}</span>
+                      <el-tag 
+                        :type="device.required ? 'danger' : 'info'" 
+                        size="small" 
+                        class="device-status-tag"
+                      >
+                        {{ device.required ? '必选' : '可选' }}
+                      </el-tag>
+                    </div>
+                  </div>
+                  <div class="device-selector">
+                    <el-select 
+                      v-model="deviceMapping[device.id || device.logicalId]" 
+                      :placeholder="device.required ? '请选择设备（必选）' : '请选择设备（可选）'"
+                      style="width: 100%"
+                      :class="{ 'required-select': device.required }"
+                      size="default"
+                    >
+                      <el-option 
+                        v-for="availableDevice in getAvailableDevices(device.type)" 
+                        :key="availableDevice.id"
+                        :label="`${availableDevice.name} (${availableDevice.id})`"
+                        :value="availableDevice.id"
+                      />
+                    </el-select>
+                  </div>
+                  <div v-if="device.description" class="device-description">
+                    <el-text type="info" size="small">
+                      <el-icon class="description-icon"><InfoFilled /></el-icon>
+                      {{ device.description }}
+                    </el-text>
+                  </div>
+                </div>
+              </div>
             </div>
             <el-empty v-else description="此玩法不需要设备映射" />
           </div>
@@ -112,6 +135,35 @@
       </el-col>
     </el-row>
 
+    <!-- 风险告知 -->
+    <div class="risk-notice">
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+      >
+        <template #title>
+          <span class="risk-title">重要安全提醒</span>
+        </template>
+        <div class="risk-text">
+          <p><strong>设备风险：</strong>由于设备、网络的不确定性，设备存在失效风险，请用户自行准备脱困道具。</p>
+          <p><strong>刺激设备风险：</strong>对于有人体刺激的设备，用户需自行控制强度，自行承担风险。</p>
+          <p><strong>免责声明：</strong>软件为开源软件，作者无法约束代码内容。使用本系统及相关设备产生的任何风险和后果，需用户自行承担。</p>
+        </div>
+      </el-alert>
+      <div class="risk-confirmation">
+        <el-checkbox 
+          v-model="riskAcknowledged" 
+          size="large"
+          class="risk-checkbox"
+        >
+          <span class="confirmation-text">
+            我已阅读并理解上述风险告知，愿意自行承担相关风险
+          </span>
+        </el-checkbox>
+      </div>
+    </div>
+
     <!-- 操作按钮 -->
     <div class="config-actions">
       <el-button @click="cancel">取消</el-button>
@@ -123,13 +175,17 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/gameStore'
 import { useDeviceStore } from '@/stores/deviceStore'
+import { InfoFilled } from '@element-plus/icons-vue'
 
 export default {
   name: 'GameplayConfig',
+  components: {
+    InfoFilled
+  },
   setup() {
     const router = useRouter()
     const gameStore = useGameStore()
@@ -138,6 +194,7 @@ export default {
     const config = ref({})
     const deviceMapping = ref({})
     const parameters = ref({})
+    const riskAcknowledged = ref(false)
     
     // 从 sessionStorage 恢复状态
     const restoreFromSessionStorage = () => {
@@ -169,6 +226,16 @@ export default {
       
       config.value = gameStore.currentGameplayConfig
       
+      // 从 localStorage 恢复风险确认状态
+      try {
+        const savedRiskAcknowledged = localStorage.getItem('riskAcknowledged')
+        if (savedRiskAcknowledged !== null) {
+          riskAcknowledged.value = JSON.parse(savedRiskAcknowledged)
+        }
+      } catch (error) {
+        console.error('恢复风险确认状态失败:', error)
+      }
+      
       // 初始化设备映射
       if (config.value.requiredDevices) {
         config.value.requiredDevices.forEach(device => {
@@ -190,6 +257,15 @@ export default {
       
       // 初始化设备列表
        deviceStore.initDeviceList()
+    })
+    
+    // 监听风险确认状态变化，自动保存到 localStorage
+    watch(riskAcknowledged, (newValue) => {
+      try {
+        localStorage.setItem('riskAcknowledged', JSON.stringify(newValue))
+      } catch (error) {
+        console.error('保存风险确认状态失败:', error)
+      }
     })
     
     // 清理 sessionStorage（除非是热更新）
@@ -218,6 +294,10 @@ export default {
             return false
           }
         }
+      }
+      // 检查是否已确认风险告知
+      if (!riskAcknowledged.value) {
+        return false
       }
       return true
     })
@@ -265,6 +345,7 @@ export default {
       config,
       deviceMapping,
       parameters,
+      riskAcknowledged,
       deviceStore,
       getAvailableDevices,
       canStart,
@@ -316,6 +397,19 @@ export default {
   margin-top: 5px;
 }
 
+.device-description {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+}
+
+.description-icon {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
 .debug-card {
   margin-bottom: 20px;
 }
@@ -329,6 +423,45 @@ export default {
   overflow-y: auto;
 }
 
+.risk-notice {
+  margin-bottom: 16px;
+}
+
+.risk-text {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.risk-text p {
+  margin: 4px 0;
+  color: #606266;
+  font-size: 13px;
+}
+
+.risk-text strong {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+.risk-confirmation {
+  margin-top: 6px;
+  padding: 6px;
+  background-color: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.risk-checkbox {
+  font-size: 13px;
+}
+
+.confirmation-text {
+  font-weight: 500;
+  color: #303133;
+  line-height: 1.4;
+  font-size: 13px;
+}
+
 .config-actions {
   text-align: center;
   padding: 20px;
@@ -340,10 +473,117 @@ export default {
   margin: 0 10px;
 }
 
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.device-item {
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background-color: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.device-item:hover {
+  border-color: #c0c4cc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.required-device-item {
+  border-color: #f56c6c;
+  background-color: #fef0f0;
+}
+
+.required-device-item:hover {
+  border-color: #f56c6c;
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.device-header {
+  margin-bottom: 12px;
+}
+
+.device-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.device-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #303133;
+}
+
+.device-status-tag {
+  font-weight: 500;
+}
+
+.device-selector {
+  margin-bottom: 8px;
+}
+
+.required-select .el-input__wrapper {
+  border-color: #f56c6c;
+}
+
+.required-select .el-input__wrapper:hover {
+  border-color: #f56c6c;
+}
+
+.required-select .el-input__wrapper.is-focus {
+  border-color: #f56c6c;
+  box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.2);
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .config-content .el-col {
     margin-bottom: 20px;
+  }
+  
+  .device-item {
+    padding: 12px;
+  }
+  
+  .device-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .device-name {
+    font-size: 13px;
+  }
+  
+  .device-description {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  
+  .risk-notice {
+    margin-bottom: 12px;
+  }
+  
+  .risk-text p {
+    font-size: 12px;
+    margin: 3px 0;
+  }
+  
+  .risk-confirmation {
+    padding: 8px;
+    margin-top: 8px;
+  }
+  
+  .confirmation-text {
+    font-size: 12px;
+  }
+  
+  .risk-checkbox {
+    font-size: 12px;
   }
   
   .config-actions {

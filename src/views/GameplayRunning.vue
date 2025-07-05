@@ -84,12 +84,6 @@
 
     <!-- 悬浮控制按钮 -->
     <div class="floating-controls">
-      <el-button @click="pauseGameplay" v-if="status === 'running'" type="warning" size="small" class="floating-btn">
-        暂停
-      </el-button>
-      <el-button @click="resumeGameplay" v-if="status === 'paused'" type="primary" size="small" class="floating-btn">
-        继续
-      </el-button>
       <el-button @click="stopGameplay" type="danger" size="small" class="floating-btn">
         停止
       </el-button>
@@ -133,7 +127,6 @@ export default {
     const statusType = computed(() => {
       switch (status.value) {
         case 'running': return 'success'
-        case 'paused': return 'warning'
         case 'stopped': return 'danger'
         default: return 'info'
       }
@@ -142,7 +135,6 @@ export default {
     const statusText = computed(() => {
       switch (status.value) {
         case 'running': return '运行中'
-        case 'paused': return '已暂停'
         case 'stopped': return '已停止'
         default: return '未知状态'
       }
@@ -219,23 +211,7 @@ export default {
       }
     }
     
-    const pauseGameplay = () => {
-      try {
-        gameplayService.pauseGameplay()
-        status.value = 'paused'
-      } catch (error) {
-        addLog(`暂停玩法失败: ${error.message}`, 'error')
-      }
-    }
-    
-    const resumeGameplay = () => {
-      try {
-        gameplayService.resumeGameplay()
-        status.value = 'running'
-      } catch (error) {
-        addLog(`恢复玩法失败: ${error.message}`, 'error')
-      }
-    }
+
     
     const stopGameplay = async () => {
       try {
@@ -261,7 +237,7 @@ export default {
     const goBack = async () => {
       try {
         // 如果玩法正在运行，先停止它
-        if (status.value === 'running' || status.value === 'paused') {
+        if (status.value === 'running') {
           await gameplayService.stopGameplay()
           addLog('离开页面，自动停止玩法', 'info')
         }
@@ -413,7 +389,7 @@ export default {
     onUnmounted(async () => {
       try {
         // 如果玩法正在运行，先停止它
-        if (status.value === 'running' || status.value === 'paused') {
+        if (status.value === 'running') {
           await gameplayService.stopGameplay()
           console.log('组件销毁，自动停止玩法')
         }
@@ -460,8 +436,7 @@ export default {
       toggleAutoScroll,
       getDeviceName,
       getDeviceStatus,
-      pauseGameplay,
-      resumeGameplay,
+
       stopGameplay,
       goBack
     }
@@ -474,6 +449,15 @@ export default {
   padding: 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 全屏模式下的样式调整 */
+@media (min-width: 1px) {
+  .gameplay-running {
+    padding: 10px;
+  }
 }
 
 .header-card {

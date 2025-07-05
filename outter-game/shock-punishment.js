@@ -266,25 +266,7 @@ export class ShockPunishmentGame {
     console.log(`   最终阶段: ${this.state.currentPhase}`)
   }
   
-  /**
-   * 暂停游戏
-   * @param {Object} deviceManager - 设备管理器
-   * @param {Object} params - 游戏参数
-   */
-  async pause(deviceManager, params) {
-    console.log('⏸️ 游戏暂停')
-    await deviceManager.executeAction('shock_device', 'disable')
-  }
-  
-  /**
-   * 恢复游戏
-   * @param {Object} deviceManager - 设备管理器
-   * @param {Object} params - 游戏参数
-   */
-  async resume(deviceManager, params) {
-    console.log('▶️ 游戏恢复')
-    await deviceManager.executeAction('shock_device', 'enable')
-  }
+
   
   /**
    * 更新游戏阶段

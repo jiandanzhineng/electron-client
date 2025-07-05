@@ -7,7 +7,7 @@ export class MaidPunishmentGame {
   constructor() {
     this.title = "女仆偷懒惩罚游戏"
     this.description = "要求保持踮脚站立，任意按钮按下时持续电击，两按钮都未按下时停止电击"
-    this.version = "1.3.0"
+    this.version = "1.4.0"
     this.author = "游戏设计师"
     
     // 当前配置的参数值
@@ -59,8 +59,8 @@ export class MaidPunishmentGame {
         logicalId: "auto_lock",
         type: "ZIDONGSUO",
         name: "自动锁",
-        required: true,
-        description: "游戏开始时锁定，时间到达后解锁"
+        required: false,
+        description: "游戏开始时锁定，时间到达后解锁（可选设备）"
       },
       {
         logicalId: "shock_device",
@@ -216,11 +216,10 @@ export class MaidPunishmentGame {
       // 如果启用手动开启，设置auto_lock设备消息监听
       if (this.config.manualStart) {
         this.setupManualStartListener()
+        // 手动开启模式下，先尝试解锁设备
+        await this.setLockState(true)
         this.log('手动开启模式已启用，等待auto_lock设备的按键点击消息...', 'info')
       }
-      
-      // 锁定自动锁设备
-      await this.lockDevice()
       
       // 如果不是手动开启模式，立即启动游戏
       if (!this.config.manualStart) {
@@ -280,7 +279,7 @@ export class MaidPunishmentGame {
   /**
    * 处理手动开启
    */
-  handleManualStart() {
+  async handleManualStart() {
     if (!this.state.waitingForManualStart) {
       return // 不在等待手动开启状态
     }
@@ -291,13 +290,16 @@ export class MaidPunishmentGame {
     this.state.lastNoShockTime = Date.now()
     
     // 启动游戏
-    this.startGameplay()
+    await this.startGameplay()
   }
   
   /**
    * 启动游戏逻辑
    */
-  startGameplay() {
+  async startGameplay() {
+    // 尝试锁定自动锁设备（如果存在）
+    await this.setLockState(false)
+    
     // 启动TD01监控
     if (this.state.hasTD01Device) {
       this.startTD01Monitoring()
@@ -588,37 +590,20 @@ export class MaidPunishmentGame {
 
   
   /**
-   * 锁定设备
+   * 设置锁定状态
+   * @param {boolean} isOpen - true为解锁，false为锁定
    */
-  async lockDevice() {
+  async setLockState(isOpen) {
     try {
-      const success = await this.deviceManager.setDeviceProperty('auto_lock', { open: 0 })
+      const success = await this.deviceManager.setDeviceProperty('auto_lock', { open: isOpen ? 1 : 0 })
       if (success) {
-        this.state.isLocked = true
-        this.log('自动锁已锁定', 'success')
+        this.state.isLocked = !isOpen
+        this.log(`自动锁已${isOpen ? '解锁' : '锁定'}`, 'success')
       } else {
-        throw new Error('锁定失败')
+        this.log(`自动锁设备不可用或${isOpen ? '解锁' : '锁定'}失败`, 'warning')
       }
     } catch (error) {
-      this.log(`设备锁定失败: ${error.message}`, 'error')
-      throw error
-    }
-  }
-  
-  /**
-   * 解锁设备
-   */
-  async unlockDevice() {
-    try {
-      const success = await this.deviceManager.setDeviceProperty('auto_lock', { open: 1 })
-      if (success) {
-        this.state.isLocked = false
-        this.log('自动锁已解锁', 'success')
-      } else {
-        throw new Error('解锁失败')
-      }
-    } catch (error) {
-      this.log(`设备解锁失败: ${error.message}`, 'error')
+      this.log(`自动锁设备不可用: ${error.message}`, 'warning')
     }
   }
   
@@ -1015,7 +1000,7 @@ export class MaidPunishmentGame {
     
     // 解锁设备
     if (this.state.isLocked) {
-      await this.unlockDevice()
+      await this.setLockState(true)
     }
     
     // 渲染游戏完成界面
@@ -1323,21 +1308,10 @@ export class MaidPunishmentGame {
     }
   }
   
-  /**
-   * 暂停游戏
-   */
-  pause() {
-    this.state.isGameActive = false
-    this.log('游戏已暂停', 'warning')
-  }
+
+
   
-  /**
-   * 恢复游戏
-   */
-  resume() {
-    this.state.isGameActive = true
-    this.log('游戏已恢复', 'success')
-  }
+
   
   /**
    * 停止游戏

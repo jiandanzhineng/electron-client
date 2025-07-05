@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { deviceTypeMap } from '../config/deviceTypes'
 
 export const useDeviceStore = defineStore('device', {
   state: () => ({
@@ -6,17 +7,7 @@ export const useDeviceStore = defineStore('device', {
     selectedDeviceId: null,
     deviceTimeouts: new Map(),
     DEVICE_OFFLINE_TIMEOUT: 60000, // 60秒
-    deviceTypeMap: {
-      'light': '智能灯',
-      'switch': '智能开关',
-      'sensor': '传感器',
-      'camera': '摄像头',
-      'QTZ': 'QTZ设备',
-      'ZIDONGSUO': '自动锁',
-      'TD01': 'TD01设备',
-      'DIANJI': '电机设备',
-      'other': '其他'
-    }
+    deviceTypeMap
   }),
 
   getters: {

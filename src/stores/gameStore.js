@@ -17,7 +17,6 @@ export const useGameStore = defineStore('game', {
     gameStatus: {
       'idle': '空闲',
       'running': '运行中',
-      'paused': '暂停',
       'finished': '已结束',
       'error': '错误'
     },
@@ -301,23 +300,10 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    // 暂停游戏
-    pauseGame(gameId) {
-      const game = this.getGameById(gameId)
-      if (game && game.status === 'running') {
-        game.status = 'paused'
-        this.saveGames()
-      }
-    },
+  
 
-    // 恢复游戏
-    resumeGame(gameId) {
-      const game = this.getGameById(gameId)
-      if (game && game.status === 'paused') {
-        game.status = 'running'
-        this.saveGames()
-      }
-    },
+
+
 
     // 结束游戏
     finishGame(gameId) {
@@ -577,41 +563,7 @@ export const useGameStore = defineStore('game', {
       }
     },
     
-    /**
-     * 暂停外部玩法
-     * @param {string} gameId - 游戏ID
-     */
-    async pauseExternalGameplay(gameId) {
-      const game = this.getGameById(gameId)
-      if (game && game.type === 'external_gameplay') {
-        try {
-          await this.gameplayService.pauseGameplay()
-          this.pauseGame(gameId)
-          console.log('外部玩法已暂停:', game.name)
-        } catch (error) {
-          console.error('暂停外部玩法失败:', error)
-          throw error
-        }
-      }
-    },
-    
-    /**
-     * 恢复外部玩法
-     * @param {string} gameId - 游戏ID
-     */
-    async resumeExternalGameplay(gameId) {
-      const game = this.getGameById(gameId)
-      if (game && game.type === 'external_gameplay') {
-        try {
-          await this.gameplayService.resumeGameplay()
-          this.resumeGame(gameId)
-          console.log('外部玩法已恢复:', game.name)
-        } catch (error) {
-          console.error('恢复外部玩法失败:', error)
-          throw error
-        }
-      }
-    },
+
     
     /**
      * 停止外部玩法

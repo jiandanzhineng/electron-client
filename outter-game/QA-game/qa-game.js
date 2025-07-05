@@ -580,21 +580,10 @@ class QAGame {
     }
   }
   
-  /**
-   * 暂停游戏
-   */
-  pause() {
-    this.state.isGameActive = false
-    this.log('游戏已暂停', 'warning')
-  }
+
+
   
-  /**
-   * 恢复游戏
-   */
-  resume() {
-    this.state.isGameActive = true
-    this.log('游戏已恢复', 'success')
-  }
+
   
   /**
    * 停止游戏

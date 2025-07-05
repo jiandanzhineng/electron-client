@@ -293,8 +293,9 @@ export const useServiceStore = defineStore('service', {
           return // 不是上报消息，忽略
         }
         
-        // 导入设备store
+        // 导入设备store和设备类型配置
         const { useDeviceStore } = await import('./deviceStore')
+        const { getDeviceTypeName } = await import('../config/deviceTypes')
         const deviceStore = useDeviceStore()
         
         // 检查设备是否已存在
@@ -302,16 +303,10 @@ export const useServiceStore = defineStore('service', {
          
          if (!device) {
            // 设备不存在，自动添加
-           const deviceTypeMap = {
-             'ZIDONGSUO': '自动锁',
-             'QTZ': 'QTZ设备',
-             'TD01': 'TD01设备',
-             'DIANJI': '电机设备'
-           }
            
            const deviceData = {
               id: deviceId,
-              name: `${deviceTypeMap[payload.device_type] || payload.device_type}-${deviceId.slice(-4)}`,
+              name: `${getDeviceTypeName(payload.device_type)}-${deviceId.slice(-4)}`,
               type: payload.device_type || 'other'
             }
            

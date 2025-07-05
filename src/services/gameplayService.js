@@ -379,7 +379,6 @@ class GameplayService {
     this.gameplayConfig = null
     this.gameplayParameters = {}
     this.isRunning = false
-    this.isPaused = false
     this.gameLoopInterval = null
     this.startTime = Date.now()
     this.deviceManager = new DeviceManager(this)
@@ -422,7 +421,7 @@ class GameplayService {
     this.messageStats.received++
     
     try {
-      this.handleMqttMessage(message)
+      const result = this.handleMqttMessage(message)
       this.messageStats.processed++
       
       // 计算处理时间
@@ -430,7 +429,7 @@ class GameplayService {
       this.updateProcessingStats(processingTime)
       
       // 解析消息内容以检查method字段
-      let logMessage = `MQTT消息处理完成: ${processingTime.toFixed(2)}ms - ${message.topic}`
+      let logMessage = `MQTT消息: ${processingTime.toFixed(2)}ms - ${message.topic} - ${result}`
       try {
         const payload = JSON.parse(message.payload)
         if (payload.method && payload.method !== 'report') {
@@ -481,13 +480,14 @@ class GameplayService {
   /**
    * 处理MQTT消息
    * @param {Object} message - MQTT消息对象
+   * @returns {string} 处理结果状态
    */
   handleMqttMessage(message) {
     try {
       // 检查是否是设备上报消息 (dpub topic)
       const topicMatch = message.topic.match(/^\/dpub\/(.+)$/)
       if (!topicMatch) {
-        return // 不是设备上报topic，忽略
+        return '非设备上报主题过滤' // 不是设备上报topic，忽略
       }
       
       const deviceId = topicMatch[1]
@@ -497,12 +497,7 @@ class GameplayService {
         .some(device => device.id === deviceId)
       
       if (!isMappedDevice) {
-        this.sendLog(`设备未映射到当前玩法: ${deviceId}`, 'debug')
-        // 展示device map
-        const mappedDevices = Array.from(this.deviceManager.deviceMap.values())
-         .map(device => device.id)
-        this.sendLog(`当前玩法已映射的设备: ${mappedDevices.join(', ')}`, 'debug')
-        return // 设备未映射到当前玩法，忽略消息
+        return '设备未映射过滤' // 设备未映射到当前玩法，忽略消息
       }
       
       // 解析消息内容
@@ -510,12 +505,12 @@ class GameplayService {
       try {
         payload = JSON.parse(message.payload)
       } catch (e) {
-        return // 解析失败，忽略
+        return '消息解析失败' // 解析失败，忽略
       }
       
       // 检查是否存在method字段
       if (!payload.hasOwnProperty('method')) {
-        return // 没有method字段，忽略
+        return '缺少method字段过滤' // 没有method字段，忽略
       }
       
       // 处理不同格式的消息
@@ -534,8 +529,11 @@ class GameplayService {
       // 将消息传递给DeviceManager处理
       this.deviceManager.handleSensorData(deviceId, deviceData)
       
+      return '处理成功'
+      
     } catch (error) {
       this.sendLog(`处理MQTT消息失败: ${error.message}`, 'error')
+      return `处理异常: ${error.message}`
     }
   }
   
@@ -735,7 +733,6 @@ class GameplayService {
       }
       
       this.isRunning = true
-      this.isPaused = false
       this.startTime = Date.now()
       
       this.sendLog(`玩法 "${this.currentGameplay.title}" 启动成功`, 'success')
@@ -760,7 +757,7 @@ class GameplayService {
     this.sendLog('启动游戏循环', 'info')
     
     this.gameLoopInterval = setInterval(async () => {
-      if (!this.isRunning || this.isPaused) {
+      if (!this.isRunning) {
         return
       }
       
@@ -784,7 +781,7 @@ class GameplayService {
    * 执行游戏循环
    */
   async executeLoop() {
-    if (!this.isRunning || this.isPaused || !this.currentGameplay) {
+    if (!this.isRunning || !this.currentGameplay) {
       return
     }
     
@@ -796,45 +793,7 @@ class GameplayService {
     }
   }
   
-  /**
-   * 暂停玩法
-   */
-  async pauseGameplay() {
-    if (!this.isRunning) {
-      throw new Error('玩法未在运行')
-    }
-    
-    this.isPaused = true
-    
-    // 调用玩法的暂停方法（如果存在）
-    if (typeof this.currentGameplay.pause === 'function') {
-      await this.currentGameplay.pause(this.deviceManager)
-    }
-    
-    this.sendLog(`玩法 "${this.currentGameplay.title}" 已暂停`, 'info')
-  }
-  
-  /**
-   * 恢复玩法
-   */
-  async resumeGameplay() {
-    if (!this.isRunning) {
-      throw new Error('玩法未在运行')
-    }
-    
-    if (!this.isPaused) {
-      throw new Error('玩法未暂停')
-    }
-    
-    this.isPaused = false
-    
-    // 调用玩法的恢复方法（如果存在）
-    if (typeof this.currentGameplay.resume === 'function') {
-      await this.currentGameplay.resume(this.deviceManager)
-    }
-    
-    this.sendLog(`玩法 "${this.currentGameplay.title}" 已恢复`, 'info')
-  }
+
   
   /**
    * 结束玩法
@@ -857,7 +816,6 @@ class GameplayService {
       }
       
       this.isRunning = false
-      this.isPaused = false
       
       // 清理设备管理器
       this.deviceManager.cleanup()
@@ -897,7 +855,6 @@ class GameplayService {
       this.sendLog('设备监听器已清理', 'info')
       
       this.isRunning = false
-      this.isPaused = false
       
       const duration = Date.now() - this.startTime
       this.sendLog(`玩法 "${this.currentGameplay.title}" 已停止，运行时长: ${Math.floor(duration / 1000)}秒`, 'success')
@@ -959,7 +916,7 @@ class GameplayService {
   getGameplayStatus() {
     return {
       isRunning: this.isRunning,
-      isPaused: this.isPaused,
+
       currentGameplay: this.currentGameplay ? {
         title: this.currentGameplay.title,
         description: this.currentGameplay.description,

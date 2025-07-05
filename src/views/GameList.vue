@@ -63,22 +63,7 @@
               >
                 ▶️
               </button>
-              <button 
-                v-if="game.status === 'running'"
-                @click.stop="pauseGame(game)"
-                class="btn btn-sm btn-warning"
-                title="暂停游戏"
-              >
-                ⏸️
-              </button>
-              <button 
-                v-if="game.status === 'paused'"
-                @click.stop="resumeGame(game)"
-                class="btn btn-sm btn-success"
-                title="恢复游戏"
-              >
-                ▶️
-              </button>
+
               <button 
                 v-if="game.status !== 'stopped'"
                 @click.stop="stopGame(game)"
@@ -316,29 +301,7 @@ async function startGame(game) {
   }
 }
 
-async function pauseGame(game) {
-  try {
-    if (game.type === 'external_gameplay') {
-      await gameStore.pauseExternalGameplay(game.id)
-    } else {
-      gameStore.pauseGame(game.id)
-    }
-  } catch (error) {
-    alert(`暂停失败: ${error.message}`)
-  }
-}
 
-async function resumeGame(game) {
-  try {
-    if (game.type === 'external_gameplay') {
-      await gameStore.resumeExternalGameplay(game.id)
-    } else {
-      gameStore.resumeGame(game.id)
-    }
-  } catch (error) {
-    alert(`恢复失败: ${error.message}`)
-  }
-}
 
 async function stopGame(game) {
   try {
@@ -832,10 +795,7 @@ async function saveGameplayIndex(config, savedPath) {
   color: #155724;
 }
 
-.game-status.paused {
-  background: #fff3cd;
-  color: #856404;
-}
+
 
 .game-status.finished {
   background: #d1ecf1;
