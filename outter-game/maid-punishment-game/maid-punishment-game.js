@@ -19,7 +19,8 @@ export class MaidPunishmentGame {
       allowUnsafeIntensity: false,
       td01DelaySeconds: 5,
       td01IntensityIncrease: 50,
-      manualStart: false
+      manualStart: false,
+      td01ShockProbability: 0
     }
     
     // 游戏状态
@@ -154,6 +155,15 @@ export class MaidPunishmentGame {
         type: 'boolean',
         default: false,
         description: '启用后，游戏加载完成后等待auto_lock设备的按键点击消息才开始游戏'
+      },
+      td01ShockProbability: {
+        name: 'TD01启动时电击概率',
+        type: 'number',
+        min: 0,
+        max: 100,
+        step: 1,
+        default: 0,
+        description: 'TD01启动时同时开启电击的概率（0-100%）'
       }
     }
   }
@@ -508,6 +518,26 @@ export class MaidPunishmentGame {
       })
       
       this.log(`TD01设备已启动，初始强度: ${this.state.td01Intensity}`, 'success')
+      
+      // 检查是否需要同时开启电击
+      if (this.config.td01ShockProbability > 0) {
+        const randomValue = Math.random() * 100
+        this.log(`TD01电击概率判断: 随机值=${randomValue.toFixed(2)}, 设定概率=${this.config.td01ShockProbability}%`, 'info')
+        
+        if (randomValue < this.config.td01ShockProbability) {
+          this.log('TD01启动时电击概率判定通过，同时执行电击', 'warning')
+          
+          // 设置电击强度和启动电击
+          await this.deviceManager.setDeviceProperty('shock_device', {
+            voltage: this.config.shockIntensity,
+            shock: 1
+          })
+          
+          this.log(`TD01启动时电击已执行，强度: ${this.config.shockIntensity}`, 'warning')
+        } else {
+          this.log('TD01启动时电击概率判定未通过', 'info')
+        }
+      }
       
       // 启动强度递增计时器
       this.startTD01IntensityIncrease()
