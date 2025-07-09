@@ -7,7 +7,7 @@ export class MaidPunishmentGame {
   constructor() {
     this.title = "女仆偷懒惩罚游戏"
     this.description = "要求保持踮脚站立，任意按钮按下时持续电击，两按钮都未按下时停止电击"
-    this.version = "1.4.0"
+    this.version = "1.5.0"
     this.author = "游戏设计师"
     
     // 当前配置的参数值
