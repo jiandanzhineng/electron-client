@@ -12,9 +12,11 @@ import { onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar from './components/Sidebar.vue'
 import { useServiceStore } from './stores/serviceStore'
+import { useDeviceStore } from './stores/deviceStore'
 
 const route = useRoute()
 const serviceStore = useServiceStore()
+const deviceStore = useDeviceStore()
 
 // 计算是否显示侧边栏 - 在游戏运行页面时隐藏侧边栏
 const showSidebar = computed(() => {
@@ -26,6 +28,9 @@ let serverLogListener = null
 onMounted(() => {
   // 初始化服务状态监听器
   serviceStore.init()
+  
+  // 初始化设备store
+  deviceStore.initDeviceList()
   
   // 监听服务器日志事件
   if (window.electronAPI && window.electronAPI.onServerLog) {
@@ -46,6 +51,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理设备store资源
+  deviceStore.cleanup()
+  
   // 清理事件监听器
   if (serverLogListener) {
     // 注意：这里可能需要根据实际的API来移除监听器

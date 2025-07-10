@@ -45,49 +45,7 @@ class DeviceManager {
 
 
 
-  /**
-   * 执行设备动作
-   * @param {string} logicalId - 逻辑设备ID
-   * @param {string} action - 动作名称
-   * @param {Object} params - 动作参数
-   */
-  async executeDeviceAction(logicalId, action, params = {}) {
-    const device = this.deviceMap.get(logicalId)
-    if (!device) {
-      this.sendLog(`设备未找到: ${logicalId}`, 'error')
-      return false
-    }
 
-    try {
-      this.sendLog(`执行设备动作: ${device.name} -> ${action}`, 'info')
-      
-      // 这里应该通过IPC调用主进程的设备控制方法
-      // 暂时使用模拟实现
-      const result = await this.sendDeviceCommand(device, action, params)
-      
-      this.sendLog(`设备动作执行成功: ${device.name} -> ${action}`, 'success')
-      return result
-    } catch (error) {
-      this.sendLog(`设备动作执行失败: ${device.name} -> ${action} (${error.message})`, 'error')
-      return false
-    }
-  }
-
-  /**
-   * 发送设备命令（通过IPC）
-   * @param {Object} device - 设备对象
-   * @param {string} action - 动作名称
-   * @param {Object} params - 参数
-   */
-  async sendDeviceCommand(device, action, params) {
-    // 这里应该调用Electron的IPC通信
-    // 暂时返回模拟结果
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true, action, params, deviceId: device.id })
-      }, 100)
-    })
-  }
 
   /**
    * 注册传感器数据回调
@@ -942,13 +900,63 @@ class GameplayService {
   }
   
   /**
+   * 解析文件路径，处理特殊标记
+   * @param {string} filePath - 原始文件路径
+   * @returns {Promise<string>} 解析后的文件路径
+   */
+  async resolveFilePath(filePath) {
+    if (!filePath) return filePath
+    
+    // 处理<OUTTER_GAME>标记
+    if (filePath.includes('<OUTTER_GAME>')) {
+      try {
+        // 获取应用路径信息
+        const pathInfo = await window.electronAPI?.invoke('get-app-paths')
+        let outterGamePath
+        
+        if (pathInfo) {
+          if (import.meta.env.DEV) {
+            // 开发环境：直接从项目目录
+            outterGamePath = `${pathInfo.appPath}/outter-game`
+          } else {
+            // 生产环境：从extraResources
+            outterGamePath = `${pathInfo.resourcesPath}/outter-game`
+          }
+        } else {
+          // 回退方案
+          if (import.meta.env.DEV) {
+            outterGamePath = 'e:/develop/electron-client/outter-game'
+          } else {
+            outterGamePath = './outter-game'
+          }
+        }
+        
+        return filePath.replace('<OUTTER_GAME>', outterGamePath)
+      } catch (error) {
+        this.sendLog(`路径解析失败: ${error.message}`, 'error')
+        // 回退到原始路径
+        return filePath
+      }
+    }
+    
+    return filePath
+  }
+  
+  /**
    * 读取外部文件内容
-   * @param {string} filePath - 文件路径
+   * @param {string} filePath - 文件路径（支持<OUTTER_GAME>标记）
    * @returns {Promise<string>} 文件内容
    */
   async readExternalFile(filePath) {
     try {
-      const result = await window.electronAPI.invoke('read-file', filePath)
+      // 解析路径标记
+      const resolvedPath = await this.resolveFilePath(filePath)
+      
+      if (resolvedPath !== filePath) {
+        this.sendLog(`路径解析: ${filePath} -> ${resolvedPath}`, 'info')
+      }
+      
+      const result = await window.electronAPI.invoke('read-file', resolvedPath)
       if (!result.success) {
         throw new Error(`读取文件失败: ${result.error}`)
       }

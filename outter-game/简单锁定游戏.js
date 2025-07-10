@@ -155,7 +155,8 @@ export class SimpleLockGame {
     // 锁定设备 - 设置设备属性open为0
     const success = await this.deviceManager.setDeviceProperty(
       this.targetDevice,
-      { open: 0 }
+      'open',
+      0
     )
     
     if (success) {
@@ -230,7 +231,8 @@ export class SimpleLockGame {
     // 解锁设备 - 设置设备属性open为1
     await this.deviceManager.setDeviceProperty(
       this.targetDevice,
-      { open: 1 }
+      'open',
+      1
     )
     
     // 发送游戏结束消息

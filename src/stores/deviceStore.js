@@ -5,9 +5,10 @@ export const useDeviceStore = defineStore('device', {
   state: () => ({
     devices: [],
     selectedDeviceId: null,
-    deviceTimeouts: new Map(),
     DEVICE_OFFLINE_TIMEOUT: 60000, // 60秒
-    deviceTypeMap
+    deviceTypeMap,
+    offlineCheckInterval: null, // 离线检查定时器
+    OFFLINE_CHECK_INTERVAL: 3000 // 3秒检查一次
   }),
 
   getters: {
@@ -31,27 +32,17 @@ export const useDeviceStore = defineStore('device', {
       if (savedDevices) {
         try {
           this.devices = JSON.parse(savedDevices)
-          // 重新启动在线设备的离线检测定时器
-          this.devices.forEach(device => {
-            if (device.connected && device.lastReport) {
-              const timeSinceLastReport = Date.now() - device.lastReport
-              if (timeSinceLastReport < this.DEVICE_OFFLINE_TIMEOUT) {
-                const remainingTime = this.DEVICE_OFFLINE_TIMEOUT - timeSinceLastReport
-                const timeoutId = setTimeout(() => {
-                  this.markDeviceOffline(device.id)
-                }, remainingTime)
-                this.deviceTimeouts.set(device.id, timeoutId)
-              } else {
-                device.connected = false
-              }
-            }
-          })
+          // 检查已保存设备的离线状态
+          this.checkDevicesOfflineStatus()
           this.updateDeviceTable()
         } catch (error) {
           console.error('Failed to load devices from localStorage:', error)
           this.devices = []
         }
       }
+      
+      // 启动离线检查循环
+      this.startOfflineCheck()
     },
 
     // 添加设备
@@ -74,12 +65,6 @@ export const useDeviceStore = defineStore('device', {
     removeDevice(deviceId) {
       const index = this.devices.findIndex(device => device.id === deviceId)
       if (index !== -1) {
-        // 清除定时器
-        if (this.deviceTimeouts.has(deviceId)) {
-          clearTimeout(this.deviceTimeouts.get(deviceId))
-          this.deviceTimeouts.delete(deviceId)
-        }
-        
         this.devices.splice(index, 1)
         this.saveDevices()
         this.updateDeviceTable()
@@ -101,37 +86,54 @@ export const useDeviceStore = defineStore('device', {
           device.connected = true
         }
         
-        // 重置离线检测定时器
-        if (this.deviceTimeouts.has(deviceId)) {
-          clearTimeout(this.deviceTimeouts.get(deviceId))
-        }
-        
-        const timeoutId = setTimeout(() => {
-          this.markDeviceOffline(deviceId)
-        }, this.DEVICE_OFFLINE_TIMEOUT)
-        
-        this.deviceTimeouts.set(deviceId, timeoutId)
         this.saveDevices()
         this.updateDeviceTable()
       }
     },
 
-    // 标记设备离线（1分钟未收到消息则标记为离线）
+    // 标记设备离线
     markDeviceOffline(deviceId) {
       const device = this.getDeviceById(deviceId)
-      if (device) {
-        // 1分钟未收到消息则标记设备为离线
+      if (device && device.connected) {
         device.connected = false
         this.saveDevices()
         this.updateDeviceTable()
-        
-        // 清除定时器
-        if (this.deviceTimeouts.has(deviceId)) {
-          clearTimeout(this.deviceTimeouts.get(deviceId))
-          this.deviceTimeouts.delete(deviceId)
+        console.log(`设备 ${deviceId} 超过${this.DEVICE_OFFLINE_TIMEOUT/1000}秒未上报，已标记为离线`)
+      }
+    },
+
+    // 检查所有设备的离线状态
+    checkDevicesOfflineStatus() {
+      const currentTime = Date.now()
+      this.devices.forEach(device => {
+        if (device.connected && device.lastReport) {
+          const timeSinceLastReport = currentTime - device.lastReport
+          if (timeSinceLastReport > this.DEVICE_OFFLINE_TIMEOUT) {
+            this.markDeviceOffline(device.id)
+          }
         }
-        
-        console.log(`设备 ${deviceId} 超过1分钟未上报，已标记为离线`)
+      })
+    },
+
+    // 启动离线检查循环
+    startOfflineCheck() {
+      if (this.offlineCheckInterval) {
+        return // 已经启动了
+      }
+      
+      this.offlineCheckInterval = setInterval(() => {
+        this.checkDevicesOfflineStatus()
+      }, this.OFFLINE_CHECK_INTERVAL)
+      
+      console.log(`离线检查循环已启动，每${this.OFFLINE_CHECK_INTERVAL/1000}秒检查一次`)
+    },
+
+    // 停止离线检查循环
+    stopOfflineCheck() {
+      if (this.offlineCheckInterval) {
+        clearInterval(this.offlineCheckInterval)
+        this.offlineCheckInterval = null
+        console.log('离线检查循环已停止')
       }
     },
 
@@ -159,6 +161,11 @@ export const useDeviceStore = defineStore('device', {
     refreshDevices() {
       // 可以在这里添加刷新逻辑
       this.updateDeviceTable()
+    },
+
+    // 清理资源（应用关闭时调用）
+    cleanup() {
+      this.stopOfflineCheck()
     }
   }
 })

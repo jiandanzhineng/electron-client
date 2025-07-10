@@ -268,13 +268,13 @@ export const useServiceStore = defineStore('service', {
       }
     },
 
-    // 处理设备上报消息
-    async handleDeviceReport(message) {
+    // 处理设备消息（包括所有来自设备的消息）
+    async handleDeviceMessage(message) {
       try {
         // 检查是否是dpub topic格式: /dpub/XXXX (任意设备标识)
         const topicMatch = message.topic.match(/^\/dpub\/(.+)$/)
         if (!topicMatch) {
-          return // 不是设备上报topic，忽略
+          return // 不是设备topic，忽略
         }
         
         const deviceId = topicMatch[1]
@@ -288,41 +288,52 @@ export const useServiceStore = defineStore('service', {
           return
         }
         
-        // 检查是否是report方法
-        if (payload.method !== 'report') {
-          return // 不是上报消息，忽略
-        }
-        
         // 导入设备store和设备类型配置
         const { useDeviceStore } = await import('./deviceStore')
         const { getDeviceTypeName } = await import('../config/deviceTypes')
         const deviceStore = useDeviceStore()
         
         // 检查设备是否已存在
-         let device = deviceStore.getDeviceById(deviceId)
-         
-         if (!device) {
-           // 设备不存在，自动添加
-           
-           const deviceData = {
+        let device = deviceStore.getDeviceById(deviceId)
+        
+        if (!device) {
+          // 设备不存在，自动添加（仅在report消息时添加）
+          if (payload.method === 'report') {
+            const deviceData = {
               id: deviceId,
               name: `${getDeviceTypeName(payload.device_type)}-${deviceId.slice(-4)}`,
               type: payload.device_type || 'other'
             }
-           
-           deviceStore.addDevice(deviceData)
-           this.addServerLog(`自动添加设备: ${deviceData.name} (${deviceId})`)
-         }
-         
-         // 更新设备数据 - 除了method之外的所有属性都作为设备属性
-         const updateData = { ...payload }
-         delete updateData.method // 移除method字段
-         
-         deviceStore.updateDeviceData(deviceId, updateData)
+            
+            deviceStore.addDevice(deviceData)
+            this.addServerLog(`自动添加设备: ${deviceData.name} (${deviceId})`)
+            device = deviceStore.getDeviceById(deviceId)
+          } else {
+            // 非report消息但设备不存在，仅更新最后消息时间
+            return
+          }
+        }
+        
+        // 对于report消息，更新设备数据
+        if (payload.method === 'report') {
+          const updateData = { ...payload }
+          delete updateData.method // 移除method字段
+          deviceStore.updateDeviceData(deviceId, updateData)
+        } else {
+          // 对于非report消息，仅更新最后消息时间和连接状态
+          if (device) {
+            device.lastReport = Date.now()
+            if (!device.connected) {
+              device.connected = true
+            }
+            deviceStore.saveDevices()
+            deviceStore.updateDeviceTable()
+          }
+        }
         
       } catch (error) {
-        console.error('处理设备上报消息失败:', error)
-        this.addServerLog(`处理设备上报消息失败: ${error.message}`)
+        console.error('处理设备消息失败:', error)
+        this.addServerLog(`处理设备消息失败: ${error.message}`)
       }
     },
 
@@ -383,8 +394,8 @@ export const useServiceStore = defineStore('service', {
         window.electronAPI.onMqttMessage((message) => {
           this.addServerLog(`MQTT消息: ${message.topic} - ${message.payload}`)
           
-          // 处理设备上报消息
-          this.handleDeviceReport(message)
+          // 处理设备消息
+          this.handleDeviceMessage(message)
         })
         
         // 启动后自动尝试连接MQTT

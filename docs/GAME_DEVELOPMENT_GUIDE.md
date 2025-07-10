@@ -152,43 +152,421 @@ async end(deviceManager) {
 
 **注意：** `end` 方法是供 gameplayService 调用的标准接口，用于外部停止游戏时的清理工作。该方法通常调用内部的 `endGame` 方法来执行实际的结束逻辑。
 
+**⚠️ 重要提醒：endGame过程中不要进行游戏初始化，否则会在游戏结束时重新开始游戏。**
+
 ## 设备管理器 API
 
-### 设备属性监听
+设备管理器 (DeviceManager) 是游戏与硬件设备交互的核心接口，提供了完整的设备控制和监听功能。
+
+### 设备查询方法
+
+#### getDevices()
+获取所有可用设备列表
 
 ```javascript
-// 监听设备属性变化
-this.deviceManager.listenDeviceProperty('logical_id', 'property_name', (newValue, deviceData) => {
-  // 处理属性变化
+// 获取所有设备
+const devices = this.deviceManager.getDevices()
+console.log('可用设备:', devices)
+```
+
+#### findDeviceByLogicalId(logicalId)
+根据逻辑ID查找设备
+
+```javascript
+// 查找特定设备
+const device = this.deviceManager.findDeviceByLogicalId('my_device')
+if (device) {
+  console.log('找到设备:', device.name)
+}
+```
+
+#### findDevicesByType(deviceType)
+根据设备类型查找设备
+
+```javascript
+// 查找所有电击设备
+const shockDevices = this.deviceManager.findDevicesByType('DIANJI')
+console.log('电击设备数量:', shockDevices.length)
+```
+
+#### isDeviceOnline(deviceId)
+检查设备是否在线
+
+```javascript
+// 检查设备在线状态
+if (this.deviceManager.isDeviceOnline('device_id')) {
+  console.log('设备在线')
+} else {
+  console.log('设备离线')
+}
+```
+
+### 设备属性操作
+
+#### setDeviceProperty(logicalId, properties)
+设置设备属性（异步方法）
+
+```javascript
+// 设置单个属性
+await this.deviceManager.setDeviceProperty('shock_device', {
+  intensity: 50
 })
+
+// 设置多个属性
+await this.deviceManager.setDeviceProperty('lock_device', {
+  locked: true,
+  timeout: 300
+})
+
+// 检查设置结果
+const success = await this.deviceManager.setDeviceProperty('device_id', {
+  property: value
+})
+if (success) {
+  console.log('属性设置成功')
+} else {
+  console.log('属性设置失败')
+}
+```
+
+#### getDeviceProperty(logicalId, property)
+获取设备属性值
+
+```javascript
+// 获取设备属性
+const intensity = this.deviceManager.getDeviceProperty('shock_device', 'intensity')
+const isLocked = this.deviceManager.getDeviceProperty('lock_device', 'locked')
+
+if (intensity !== null) {
+  console.log('当前强度:', intensity)
+}
 ```
 
 ### 设备消息监听
 
+#### listenDeviceMessages(logicalId, callback)
+监听设备的所有MQTT消息
+
 ```javascript
 // 监听设备消息
-this.deviceManager.listenDeviceMessages('logical_id', (deviceData) => {
-  // 处理设备消息
+this.deviceManager.listenDeviceMessages('button_device', (deviceData) => {
+  console.log('收到设备消息:', deviceData)
+  
+  // 处理按键事件
+  if (deviceData.method === 'action' && deviceData.action === 'key_clicked') {
+    this.handleButtonClick()
+  }
+  
+  // 处理传感器数据
+  if (deviceData.method === 'report') {
+    this.handleSensorData(deviceData)
+  }
 })
 ```
 
-### 设置设备属性
+#### listenDeviceProperty(logicalId, property, callback)
+监听设备特定属性的变化
 
 ```javascript
-// 设置设备属性
-await this.deviceManager.setDeviceProperty('logical_id', {
-  property1: value1,
-  property2: value2
+// 监听距离传感器
+this.deviceManager.listenDeviceProperty('distance_sensor', 'distance', (newValue, deviceData) => {
+  console.log('距离变化:', newValue)
+  
+  if (newValue < 10) {
+    this.handleCloseProximity()
+  }
+})
+
+// 监听按钮状态
+this.deviceManager.listenDeviceProperty('button_device', 'button1', (newValue, deviceData) => {
+  if (newValue === 1) {
+    console.log('按钮被按下')
+    this.handleButtonPress()
+  } else {
+    console.log('按钮被释放')
+    this.handleButtonRelease()
+  }
 })
 ```
 
-### 检查设备状态
+### 直接MQTT通信
+
+#### sendDeviceMqttMessage(logicalId, message)
+直接向设备发送MQTT消息
 
 ```javascript
-// 获取设备映射信息
+// 发送自定义命令
+await this.deviceManager.sendDeviceMqttMessage('custom_device', {
+  method: 'custom_action',
+  command: 'start_sequence',
+  parameters: {
+    duration: 5000,
+    intensity: 75
+  }
+})
+
+// 发送控制指令
+await this.deviceManager.sendDeviceMqttMessage('lock_device', {
+  method: 'control',
+  action: 'unlock'
+})
+```
+
+#### sendMqttMessage(topic, message)
+向指定MQTT主题发送消息
+
+```javascript
+// 发送到特定主题
+await this.deviceManager.sendMqttMessage('/custom/topic', {
+  type: 'broadcast',
+  message: 'Game started'
+})
+```
+
+### 初始化和清理方法
+
+#### initDeviceStore()
+初始化设备存储（内部方法，通常自动调用）
+
+```javascript
+// 手动初始化设备存储（通常不需要）
+const store = this.deviceManager.initDeviceStore()
+```
+
+#### cleanup()
+清理设备管理器资源
+
+```javascript
+// 清理所有监听器和缓存
+this.deviceManager.cleanup()
+
+// 通常在游戏结束时自动调用
+// 手动清理示例
+if (this.gameEnded) {
+  this.deviceManager.cleanup()
+}
+```
+
+### 高级功能
+
+#### 设备属性缓存
+设备管理器会自动缓存设备属性，确保属性监听的准确性：
+
+```javascript
+// 属性会被自动缓存，无需手动管理
+// 获取缓存的属性值
+const cachedValue = this.deviceManager.getDeviceProperty('device_id', 'property')
+```
+
+#### 消息处理统计
+设备管理器提供消息处理性能统计：
+
+```javascript
+// 查看消息统计（通过日志）
+// 统计信息包括：接收消息数、处理消息数、平均处理时间等
+```
+
+### 错误处理和调试
+
+#### 日志记录
+所有设备操作都会自动记录日志：
+
+```javascript
+// 日志会自动发送到游戏日志系统
+// 日志级别：info, success, warning, error, debug
+
+// 手动发送日志（如果需要）
+this.deviceManager.sendLog('自定义日志消息', 'info')
+```
+
+#### 常见错误处理
+
+```javascript
+// 设备未找到
+const device = this.deviceManager.findDeviceByLogicalId('unknown_device')
+if (!device) {
+  this.log('设备未找到，请检查设备映射', 'error')
+  return
+}
+
+// 设备离线
+if (!this.deviceManager.isDeviceOnline(device.id)) {
+  this.log('设备离线，无法执行操作', 'warning')
+  return
+}
+
+// 属性设置失败
+const success = await this.deviceManager.setDeviceProperty('device_id', { prop: value })
+if (!success) {
+  this.log('设备属性设置失败', 'error')
+  // 执行错误恢复逻辑
+}
+```
+
+### 最佳实践
+
+#### 1. 设备状态检查
+在执行设备操作前，始终检查设备状态：
+
+```javascript
+async performDeviceAction(logicalId, action) {
+  // 检查设备是否存在
+  const device = this.deviceManager.deviceMap.get(logicalId)
+  if (!device) {
+    this.log(`设备未映射: ${logicalId}`, 'error')
+    return false
+  }
+  
+  // 执行操作
+  return await this.deviceManager.setDeviceProperty(logicalId, action)
+}
+```
+
+#### 2. 批量设备操作
+
+```javascript
+async initializeAllDevices() {
+  const initPromises = []
+  
+  for (const [logicalId, device] of this.deviceManager.deviceMap) {
+    if (device.connected) {
+      const promise = this.deviceManager.setDeviceProperty(logicalId, {
+        game_mode: true,
+        initialized: true
+      })
+      initPromises.push(promise)
+    }
+  }
+  
+  const results = await Promise.allSettled(initPromises)
+  const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length
+  
+  this.log(`设备初始化完成: ${successCount}/${results.length}`, 'info')
+}
+```
+
+#### 3. 属性监听管理
+
+```javascript
+setupDeviceListeners() {
+  // 为每个设备设置必要的监听器
+  for (const [logicalId, device] of this.deviceManager.deviceMap) {
+    // 监听设备连接状态
+    this.deviceManager.listenDeviceProperty(logicalId, 'connected', (connected) => {
+      if (!connected) {
+        this.handleDeviceDisconnected(logicalId)
+      }
+    })
+    
+    // 监听设备特定功能
+    if (device.type === 'BUTTON') {
+      this.deviceManager.listenDeviceMessages(logicalId, (data) => {
+        this.handleButtonDevice(logicalId, data)
+      })
+    }
+  }
+}
+
+cleanupDeviceListeners() {
+  // 游戏结束时清理监听器
+  this.deviceManager.cleanup()
+}
+```
+
+### 设备映射访问
+
+#### deviceMap
+访问当前游戏的设备映射
+
+```javascript
+// 获取映射的设备
 const mappedDevice = this.deviceManager.deviceMap.get('logical_id')
-if (mappedDevice && mappedDevice.connected) {
-  // 设备已连接
+if (mappedDevice) {
+  console.log('设备名称:', mappedDevice.name)
+  console.log('设备ID:', mappedDevice.id)
+  console.log('设备类型:', mappedDevice.type)
+  console.log('连接状态:', mappedDevice.connected)
+}
+
+// 遍历所有映射的设备
+for (const [logicalId, device] of this.deviceManager.deviceMap) {
+  console.log(`${logicalId} -> ${device.name} (${device.connected ? '在线' : '离线'})`)
+}
+```
+
+### 实用示例
+
+#### 设备状态检查和初始化
+
+```javascript
+async setupDevices() {
+  // 检查所有必需设备
+  for (const deviceReq of this.requiredDevices) {
+    const device = this.deviceManager.deviceMap.get(deviceReq.logicalId)
+    
+    if (!device) {
+      this.log(`设备未映射: ${deviceReq.name}`, 'error')
+      return false
+    }
+    
+    if (!device.connected) {
+      this.log(`设备离线: ${device.name}`, 'error')
+      return false
+    }
+    
+    // 初始化设备状态
+    await this.deviceManager.setDeviceProperty(deviceReq.logicalId, {
+      initialized: true,
+      game_mode: true
+    })
+  }
+  
+  return true
+}
+```
+
+#### 复合设备控制
+
+```javascript
+async executeShockSequence(intensity, duration) {
+  // 设置电击强度
+  await this.deviceManager.setDeviceProperty('shock_device', {
+    intensity: intensity
+  })
+  
+  // 开始电击
+  await this.deviceManager.setDeviceProperty('shock_device', {
+    active: true
+  })
+  
+  // 定时停止
+  setTimeout(async () => {
+    await this.deviceManager.setDeviceProperty('shock_device', {
+      active: false
+    })
+  }, duration)
+}
+```
+
+#### 传感器数据处理
+
+```javascript
+setupSensorMonitoring() {
+  // 监听距离传感器
+  this.deviceManager.listenDeviceProperty('distance_sensor', 'distance', (distance) => {
+    this.state.currentDistance = distance
+    
+    if (distance < this.config.triggerDistance) {
+      this.handleProximityTrigger()
+    }
+  })
+  
+  // 监听按钮设备
+  this.deviceManager.listenDeviceMessages('button_device', (data) => {
+    if (data.method === 'action') {
+      this.handleButtonAction(data.action, data.button)
+    }
+  })
 }
 ```
 
@@ -309,15 +687,7 @@ async endGame() {
 }
 ```
 
-### 游戏停止处理
 
-```javascript
-async stop() {
-  this.log('游戏被停止', 'warning')
-  
-  await this.endGame()
-}
-```
 
 ## 手动启动模式支持
 
@@ -360,6 +730,85 @@ async loop(deviceManager) {
   // 其他游戏逻辑...
 }
 ```
+
+## 外部文件路径配置
+
+### 动态路径解析
+
+当游戏需要加载外部文件（如题目文件、配置文件等）时，可以使用动态路径标记来确保在开发和生产环境中都能正确找到文件。
+
+#### 路径标记
+
+系统支持以下路径标记：
+
+- `<OUTTER_GAME>` - 指向打包后的 `outter-game` 文件夹
+  - 开发环境：`项目根目录/outter-game`
+  - 生产环境：`应用资源目录/outter-game`
+
+#### 使用示例
+
+在游戏参数配置中使用动态路径：
+
+```javascript
+get parameters() {
+  return {
+    questionsFile: {
+      name: '题目文件',
+      type: 'string',
+      default: '<OUTTER_GAME>/QA-game/女仆行为规范考核题库.json',
+      description: '题目文件路径，<OUTTER_GAME> 指向打包后的 outter-game 文件夹'
+    }
+  }
+}
+```
+
+在构造函数中初始化配置：
+
+```javascript
+constructor() {
+  this.config = {
+    questionsFile: '<OUTTER_GAME>/QA-game/女仆行为规范考核题库.json'
+  }
+}
+```
+
+#### 文件加载
+
+使用 `window.gameplayService?.readExternalFile?.(filePath)` 来加载外部文件，系统会自动解析路径标记：
+
+```javascript
+async loadQuestions() {
+  try {
+    const filePath = this.config.questionsFile
+    this.log(`正在加载题目文件: ${filePath}`, 'info')
+    
+    const content = await window.gameplayService?.readExternalFile?.(filePath)
+    if (!content) {
+      throw new Error('无法读取文件内容')
+    }
+    
+    const questions = JSON.parse(content)
+    this.log(`成功加载 ${questions.length} 道题目`, 'success')
+    return questions
+  } catch (error) {
+    this.log(`加载题目失败: ${error.message}`, 'error')
+    throw error
+  }
+}
+```
+
+#### 注意事项
+
+1. **路径标记解析**：路径标记的解析由主程序的 `gameplayService` 处理，游戏代码中不需要手动解析
+2. **环境兼容性**：使用路径标记可以确保游戏在开发和生产环境中都能正确运行
+3. **错误处理**：文件加载失败时要有适当的错误处理和用户提示
+4. **文件格式**：确保外部文件格式正确，特别是 JSON 文件的语法
+
+#### 支持的文件类型
+
+- JSON 配置文件
+- 文本文件
+- 其他可以通过文本方式读取的文件
 
 ## 最佳实践
 

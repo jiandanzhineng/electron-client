@@ -75,7 +75,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 玩法文件管理相关API
   scanGameplayDirectory: (directoryPath) => ipcRenderer.invoke('scan-gameplay-directory', directoryPath),
-  copyGameplayFile: (sourcePath, targetPath) => ipcRenderer.invoke('copy-gameplay-file', sourcePath, targetPath)
+  copyGameplayFile: (sourcePath, targetPath) => ipcRenderer.invoke('copy-gameplay-file', sourcePath, targetPath),
+  
+  // 文件选择对话框
+  showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options)
 });
 
 console.log('Preload script executed');

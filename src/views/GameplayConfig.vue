@@ -116,6 +116,22 @@
                     />
                   </el-select>
                   
+                  <!-- 文件类型参数 -->
+                  <div v-else-if="param.type === 'file'" class="file-input-container">
+                    <el-input 
+                      v-model="parameters[key]" 
+                      :placeholder="param.description"
+                      readonly
+                    />
+                    <el-button 
+                      @click="selectFile(key, param)"
+                      type="primary"
+                      style="margin-left: 8px;"
+                    >
+                      浏览
+                    </el-button>
+                  </div>
+                  
                   <!-- 文本类型参数 -->
                   <el-input 
                     v-else
@@ -306,6 +322,35 @@ export default {
       router.push('/games')
     }
     
+    const selectFile = async (paramKey, param) => {
+      try {
+        const filters = []
+        if (param.fileFilter) {
+          // 确保创建纯净的对象，避免Vue响应式代理导致的序列化问题
+          filters.push({
+            name: String(param.fileFilter.name || '文件'),
+            extensions: Array.isArray(param.fileFilter.extensions) ? [...param.fileFilter.extensions] : ['*']
+          })
+        } else {
+          filters.push({ name: '所有文件', extensions: ['*'] })
+        }
+        
+        const options = {
+          properties: ['openFile'],
+          filters: filters
+        }
+        
+        const result = await window.electronAPI.showOpenDialog(options)
+        
+        if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+          parameters.value[paramKey] = result.filePaths[0]
+        }
+      } catch (error) {
+        console.error('选择文件失败:', error)
+        alert('选择文件失败: ' + error.message)
+      }
+    }
+    
     const startGameplay = async () => {
       if (!canStart.value) {
         alert('请完成所有必需的配置')
@@ -350,7 +395,8 @@ export default {
       getAvailableDevices,
       canStart,
       cancel,
-      startGameplay
+      startGameplay,
+      selectFile
     }
   }
 }
@@ -382,6 +428,16 @@ export default {
 .description {
   margin: 0;
   color: #606266;
+}
+
+.file-input-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.file-input-container .el-input {
+  flex: 1;
   font-size: 14px;
 }
 
