@@ -23,7 +23,7 @@
   "license": "ISC",
   "description": "一个基于Electron的跨平台桌面应用",
   "devDependencies": {
-    "concurrently": "^9.1.2",
+    "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "electron": "^36.2.1",
     "electron-builder": "^24.13.3",

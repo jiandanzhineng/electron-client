@@ -979,6 +979,28 @@ export class ExampleGame {
     console.log(`[${level.toUpperCase()}] ${message}`)
   }
 }
+
+// 标准导出方式（必需）
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ExampleGame
+} else {
+  window.ExampleGame = ExampleGame
+}
+```
+
+## 模块导出规范
+
+**重要：** 每个游戏文件必须在末尾添加标准导出语句，确保在不同环境中正确加载。
+
+### 标准导出格式
+
+```javascript
+// 默认导出（必需）
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = YourGameClassName
+} else {
+  window.YourGameClassName = YourGameClassName
+}
 ```
 
 通过遵循这个指南，你可以创建功能完整、稳定可靠的游戏模块。记住要充分测试你的游戏，特别是设备交互和错误处理部分。
