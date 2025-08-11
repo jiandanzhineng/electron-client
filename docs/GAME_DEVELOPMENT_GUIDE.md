@@ -588,7 +588,7 @@ renderUI() {
     </div>
   `
   
-  this.uiAPI.updateGameUI(html)
+  this.uiAPI.updateUI(html)
 }
 ```
 
@@ -605,7 +605,7 @@ renderWaitingUI() {
     </div>
   `
   
-  this.uiAPI.updateGameUI(html)
+  this.uiAPI.updateUI(html)
 }
 ```
 
@@ -684,6 +684,15 @@ async endGame() {
   
   // 渲染结束界面
   this.renderEndUI()
+}
+
+/**
+ * 外部结束游戏方法 - 必须实现
+ * 用于外部系统强制结束游戏时调用
+ * @param {Object} deviceManager - 设备管理器
+ */
+async end(deviceManager) {
+  await this.endGame()
 }
 ```
 
@@ -828,17 +837,7 @@ async loadQuestions() {
 - 停止所有设备操作
 - 移除事件监听器
 
-### 4. 用户体验
 
-- 提供清晰的UI反馈
-- 重要操作要有确认提示
-- 错误信息要用户友好
-
-### 5. 安全考虑
-
-- 对于可能造成伤害的设备操作，要有安全限制
-- 提供紧急停止功能
-- 参数验证和边界检查
 
 ## 示例游戏模板
 
@@ -953,7 +952,7 @@ export class ExampleGame {
       </div>
     `
     
-    this.uiAPI.updateGameUI(html)
+    this.uiAPI.updateUI(html)
   }
   
   async endGame() {

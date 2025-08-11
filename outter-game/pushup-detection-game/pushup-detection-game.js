@@ -133,7 +133,7 @@ export class PushupDetectionGame {
       idleTimeLimit: {
         name: '无动作时间限制',
         type: 'number',
-        min: 10,
+        min: 5,
         max: 120,
         step: 1,
         default: 30,
@@ -178,7 +178,7 @@ export class PushupDetectionGame {
       rewardTriggerCount: {
         name: '奖励触发数量',
         type: 'number',
-        min: 3,
+        min: 1,
         max: 20,
         step: 1,
         default: 5,
@@ -196,7 +196,7 @@ export class PushupDetectionGame {
       vibratorIntensity: {
         name: '跳蛋强度',
         type: 'number',
-        min: 1,
+        min: 0,
         max: 255,
         step: 1,
         default: 100,
@@ -292,16 +292,20 @@ export class PushupDetectionGame {
    * 设置距离传感器监听
    */
   async setupDistanceSensorListener() {
-    // 设置QTZ设备的高低阈值
+    // 设置QTZ设备的高低阈值和报告延迟
     try {
+      // 将cm单位的配置转换为mm单位发送给QTZ设备
+      // 同时设置report_delay_ms为1000ms以提高响应速度
       await this.deviceManager.setDeviceProperty('distance_sensor', {
-        low_band: this.config.downThreshold,
-        high_band: this.config.upThreshold
+        low_band: this.config.downThreshold * 10,
+        high_band: this.config.upThreshold * 10,
+        report_delay_ms: 1000
       })
       
       this.log(`QTZ阈值已设置: 低阈值=${this.config.downThreshold}cm, 高阈值=${this.config.upThreshold}cm`, 'info')
+      this.log('QTZ报告延迟已设置为1000ms，提高游戏响应速度', 'info')
     } catch (error) {
-      this.log(`设置QTZ阈值失败: ${error.message}`, 'error')
+      this.log(`设置QTZ参数失败: ${error.message}`, 'error')
     }
     
     // 监听QTZ设备的阈值触发事件
@@ -311,7 +315,8 @@ export class PushupDetectionGame {
     
     // 监听距离属性用于UI显示
     this.deviceManager.listenDeviceProperty('distance_sensor', 'distance', (newValue, deviceData) => {
-      this.state.currentDistance = newValue
+      // QTZ传感器返回的是mm单位，转换为cm用于显示
+      this.state.currentDistance = (newValue / 10).toFixed(1)
     })
     
     this.log('QTZ事件监听已设置，开始检测俯卧撑动作', 'info')
@@ -629,6 +634,16 @@ export class PushupDetectionGame {
     await this.stopShock()
     await this.stopVibrator()
     
+    // 恢复QTZ设备的报告延迟为默认值
+    try {
+      await this.deviceManager.setDeviceProperty('distance_sensor', {
+        report_delay_ms: 10000
+      })
+      this.log('QTZ报告延迟已恢复为10000ms', 'info')
+    } catch (error) {
+      this.log(`恢复QTZ报告延迟失败: ${error.message}`, 'error')
+    }
+    
     // 解锁自动锁
     await this.setLockState(true)
     
@@ -681,8 +696,8 @@ export class PushupDetectionGame {
         
         .game-header {
           text-align: center;
-          margin-bottom: 30px;
-          padding: 20px;
+          margin-bottom: 20px;
+          padding: 15px;
           background: linear-gradient(135deg, #4CAF50, #45a049);
           color: white;
           border-radius: 10px;
@@ -702,9 +717,16 @@ export class PushupDetectionGame {
         
         .status-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 20px;
-          margin-bottom: 30px;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        
+        .status-grid-2 {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+          margin-bottom: 20px;
         }
         
         .status-card {
@@ -742,7 +764,7 @@ export class PushupDetectionGame {
         }
         
         .progress-container {
-          margin: 20px 0;
+          margin: 15px 0;
         }
         
         .progress-bar {
@@ -768,9 +790,9 @@ export class PushupDetectionGame {
         
         .device-status {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          grid-template-columns: repeat(4, 1fr);
           gap: 10px;
-          margin-top: 20px;
+          margin-top: 15px;
         }
         
         .device-item {
@@ -802,8 +824,8 @@ export class PushupDetectionGame {
         
         .action-indicator {
           text-align: center;
-          padding: 15px;
-          margin: 20px 0;
+          padding: 12px;
+          margin: 15px 0;
           border-radius: 10px;
           font-size: 18px;
           font-weight: bold;
@@ -883,7 +905,7 @@ export class PushupDetectionGame {
             <div class="status-value">${this.state.completedCount}/${this.config.targetCount}</div>
           </div>
           
-          <div class="status-card ${this.state.currentDistance <= this.config.downThreshold ? 'warning' : 'info'}">
+          <div class="status-card ${parseFloat(this.state.currentDistance) <= this.config.downThreshold ? 'warning' : 'info'}">
             <div class="status-title">当前距离</div>
             <div class="status-value">${this.state.currentDistance}cm</div>
           </div>
@@ -945,6 +967,18 @@ export class PushupDetectionGame {
           </div>
         </div>
         
+        <div class="status-grid-2">
+          <div class="status-card ${this.state.isVibratorActive ? 'warning' : 'info'}">
+            <div class="status-title">奖励状态</div>
+            <div class="status-value">${this.state.isVibratorActive ? '💫 激活中' : '⭕ 未激活'}</div>
+          </div>
+          
+          <div class="status-card info">
+            <div class="status-title">距离奖励</div>
+            <div class="status-value">${Math.max(0, this.config.rewardTriggerCount - this.state.consecutiveCount)}次</div>
+          </div>
+        </div>
+        
         <div class="device-status">
           <div class="device-item ${this.deviceManager?.deviceMap?.get('distance_sensor')?.connected ? 'active' : 'inactive'}">
             <div class="device-name">距离传感器</div>
@@ -969,7 +1003,7 @@ export class PushupDetectionGame {
       </div>
     `
     
-    this.uiAPI.updateGameUI(html)
+    this.uiAPI.updateUI(html)
   }
   
   /**
@@ -997,6 +1031,15 @@ export class PushupDetectionGame {
         console.log(logMessage)
         break
     }
+  }
+  
+  /**
+   * 外部结束游戏方法
+   * 用于外部系统强制结束游戏时调用
+   * @param {Object} deviceManager - 设备管理器
+   */
+  async end(deviceManager) {
+    await this.endGame()
   }
 }
 

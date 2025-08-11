@@ -12,7 +12,11 @@
     "dist:never": "npm run build && electron-builder --publish=never",
     "dist:installer": "npm run build && electron-builder --win nsis --publish=never",
     "dist:portable": "electron-builder --win portable --publish=never",
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node test/run-tests.js",
+    "test:verbose": "node test/run-tests.js --verbose",
+    "test:pushup": "node test/run-tests.js pushup",
+    "test:watch": "nodemon --exec \"npm test\" --watch test/ --watch outter-game/"
   },
   "keywords": [
     "electron",

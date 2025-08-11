@@ -1,0 +1,83 @@
+{
+  "testFramework": {
+    "defaultTimeout": 30000,
+    "maxConcurrentTests": 1,
+    "retryFailedTests": false,
+    "stopOnFirstFailure": false,
+    "verbose": false
+  },
+  "mockDevices": {
+    "defaultDevices": [
+      {
+        "id": "distance_sensor",
+        "type": "QTZ",
+        "properties": {
+          "distance": 30,
+          "connected": true
+        }
+      },
+      {
+        "id": "auto_lock",
+        "type": "ZIDONGSUO",
+        "properties": {
+          "open": 1,
+          "connected": true
+        }
+      },
+      {
+        "id": "shock_device",
+        "type": "DIANJI",
+        "properties": {
+          "shock": 0,
+          "intensity": 0,
+          "connected": true
+        }
+      },
+      {
+        "id": "vibrator",
+        "type": "TD01",
+        "properties": {
+          "vibrate": 0,
+          "intensity": 0,
+          "connected": true
+        }
+      }
+    ],
+    "simulationSettings": {
+      "qtzEventDelay": 50,
+      "pushupSequenceDelay": 1000,
+      "deviceResponseDelay": 10
+    }
+  },
+  "gameDefaults": {
+    "pushupGame": {
+      "duration": 5,
+      "targetCount": 10,
+      "downThreshold": 15,
+      "upThreshold": 35,
+      "idleTimeLimit": 3,
+      "shockIntensity": 20,
+      "rewardThreshold": 5,
+      "vibratorIntensity": 50
+    }
+  },
+  "reporting": {
+    "showPassedTests": true,
+    "showFailedTests": true,
+    "showSkippedTests": true,
+    "showTimings": true,
+    "showSummary": true,
+    "colorOutput": true
+  },
+  "coverage": {
+    "enabled": false,
+    "threshold": 80,
+    "includePatterns": [
+      "outter-game/**/*.js"
+    ],
+    "excludePatterns": [
+      "test/**/*.js",
+      "node_modules/**/*.js"
+    ]
+  }
+}
