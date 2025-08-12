@@ -118,7 +118,7 @@ export class PushupDetectionGame {
         min: 5,
         max: 30,
         step: 1,
-        default: 15,
+        default: 8,
         description: '身体下降到此距离以下视为"下"（厘米）'
       },
       upThreshold: {
@@ -127,7 +127,7 @@ export class PushupDetectionGame {
         min: 20,
         max: 50,
         step: 1,
-        default: 35,
+        default: 18,
         description: '身体上升到此距离以上视为"起"（厘米）'
       },
       idleTimeLimit: {
@@ -136,7 +136,7 @@ export class PushupDetectionGame {
         min: 5,
         max: 120,
         step: 1,
-        default: 30,
+        default: 15,
         description: '无动作超过此时间触发惩罚（秒）'
       },
       shockIntensity: {
@@ -181,7 +181,7 @@ export class PushupDetectionGame {
         min: 1,
         max: 20,
         step: 1,
-        default: 5,
+        default: 2,
         description: '连续完成多少个后开始奖励触发判定'
       },
       rewardTriggerProbability: {
@@ -190,7 +190,7 @@ export class PushupDetectionGame {
         min: 0,
         max: 100,
         step: 1,
-        default: 30,
+        default: 100,
         description: '达到触发条件后每完成一个的干扰触发概率（%）'
       },
       vibratorIntensity: {
