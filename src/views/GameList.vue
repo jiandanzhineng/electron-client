@@ -88,55 +88,30 @@
               </button>
             </div>
           </div>
-          
-          <div class="game-info">
-            <div class="game-category">{{ game.category }}</div>
-            <div class="game-status" :class="game.status">
-              {{ gameStore.statusMap[game.status] }}
-            </div>
-          </div>
+        
           
           <div class="game-details">
-            <div class="detail-item">
-              <label>路径:</label>
-              <span class="game-path" :title="game.path">{{ getShortPath(game.path) }}</span>
-            </div>
             <div class="detail-item" v-if="game.arguments">
               <label>参数:</label>
               <span>{{ game.arguments }}</span>
-            </div>
-            <div class="detail-item">
-              <label>添加时间:</label>
-              <span>{{ formatDate(game.createdAt) }}</span>
             </div>
             <div class="detail-item" v-if="game.lastPlayed">
               <label>最后游戏:</label>
               <span>{{ formatDate(game.lastPlayed) }}</span>
             </div>
             <div class="detail-item" v-if="game.type === 'external_gameplay' && game.requiredDevices && game.requiredDevices.length > 0">
-              <label>必备设备:</label>
+              <label>设备:</label>
               <span class="device-tags">
                 <span 
-                  v-for="device in game.requiredDevices.filter(d => d.required)" 
+                  v-for="device in game.requiredDevices" 
                   :key="device.type" 
-                  class="device-tag required"
+                  class="device-tag"
+                  :class="{ 'required': device.required, 'optional': !device.required }"
+                  :title="device.required ? '必备设备' : '可选设备'"
                 >
-                  {{ device.type }}
+                  {{ device.required ? '●' : '○' }} {{ device.type }}
                 </span>
-                <span v-if="game.requiredDevices.filter(d => d.required).length === 0" class="no-devices">无</span>
-              </span>
-            </div>
-            <div class="detail-item" v-if="game.type === 'external_gameplay' && game.requiredDevices && game.requiredDevices.length > 0">
-              <label>可选设备:</label>
-              <span class="device-tags">
-                <span 
-                  v-for="device in game.requiredDevices.filter(d => !d.required)" 
-                  :key="device.type" 
-                  class="device-tag optional"
-                >
-                  {{ device.type }}
-                </span>
-                <span v-if="game.requiredDevices.filter(d => !d.required).length === 0" class="no-devices">无</span>
+                <span v-if="game.requiredDevices.length === 0" class="no-devices">无</span>
               </span>
             </div>
           </div>
@@ -850,13 +825,15 @@ async function saveGameplayIndex(config, savedPath) {
 }
 
 .device-tag.required {
-  background: #e74c3c;
-  color: white;
+  background: #e8f5e8;
+  color: #27ae60;
+  border: 1px solid #27ae60;
 }
 
 .device-tag.optional {
-  background: #f39c12;
-  color: white;
+  background: #fff3e0;
+  color: #f39c12;
+  border: 1px solid #f39c12;
 }
 
 .no-devices {

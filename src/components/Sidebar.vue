@@ -35,6 +35,12 @@
             玩法列表
           </router-link>
         </li>
+        <li>
+          <router-link to="/settings" class="nav-link" :class="{ active: $route.path === '/settings' }">
+            <i class="icon">⚙️</i>
+            <span>设置</span>
+          </router-link>
+        </li>
       </ul>
     </div>
     

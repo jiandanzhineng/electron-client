@@ -9,6 +9,7 @@ const mdnsService = require('./mdnsService');
 const localServerService = require('./localServerService');
 const emqxService = require('./emqxService');
 const autoUpdateService = require('./autoUpdateService');
+const ttsService = require('./ttsService');
 const logger = require('./logService');
 
 class IPCHandlers {
@@ -21,6 +22,7 @@ class IPCHandlers {
     mqttService.setMainWindow(window);
     mdnsService.setMainWindow(window);
     emqxService.setMainWindow(window);
+    ttsService.setMainWindow(window);
   }
 
   // 初始化所有IPC处理器
@@ -31,6 +33,7 @@ class IPCHandlers {
     this.setupLocalServerHandlers();
     this.setupSystemHandlers();
     this.setupAutoUpdateHandlers();
+    this.setupTTSHandlers();
   }
 
   // 键盘事件处理器
@@ -40,6 +43,53 @@ class IPCHandlers {
         global.keyDownHandler(keyEvent, event.sender);
       } else if (type === 'keyup' && global.keyUpHandler) {
         global.keyUpHandler(keyEvent);
+      }
+    });
+  }
+
+  // TTS相关处理器
+  setupTTSHandlers() {
+    // 获取可用语音列表
+    ipcMain.handle('tts-get-voices', async (event) => {
+      try {
+        const voices = await ttsService.getAvailableVoices();
+        return { success: true, data: voices };
+      } catch (error) {
+        logger.error('获取语音列表失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 文本转语音
+    ipcMain.handle('tts-speak', async (event, text, options) => {
+      try {
+        await ttsService.speak(text, options);
+        return { success: true };
+      } catch (error) {
+        logger.error('TTS播放失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 停止TTS播放
+    ipcMain.handle('tts-stop', async (event) => {
+      try {
+        ttsService.stop();
+        return { success: true };
+      } catch (error) {
+        logger.error('停止TTS播放失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 检查TTS支持
+    ipcMain.handle('tts-check-support', async (event) => {
+      try {
+        const isSupported = ttsService.isSupported;
+        return { success: true, data: isSupported };
+      } catch (error) {
+        logger.error('检查TTS支持失败', 'ipc', error);
+        return { success: false, error: error.message };
       }
     });
   }
@@ -454,6 +504,7 @@ class IPCHandlers {
     mdnsService.stopService();
     localServerService.cleanup();
     emqxService.cleanup();
+    ttsService.cleanup();
   }
 }
 

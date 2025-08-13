@@ -78,7 +78,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyGameplayFile: (sourcePath, targetPath) => ipcRenderer.invoke('copy-gameplay-file', sourcePath, targetPath),
   
   // 文件选择对话框
-  showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options)
+  showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
+  
+  // TTS相关API
+  ttsGetVoices: () => ipcRenderer.invoke('tts-get-voices'),
+  ttsSpeak: (text, options) => ipcRenderer.invoke('tts-speak', text, options),
+  ttsStop: () => ipcRenderer.invoke('tts-stop'),
+  ttsCheckSupport: () => ipcRenderer.invoke('tts-check-support')
 });
 
 console.log('Preload script executed');

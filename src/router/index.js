@@ -47,6 +47,11 @@ const routes = [
      path: '/gameplay-running',
      name: 'GameplayRunning',
      component: GameplayRunning
+   },
+   {
+     path: '/settings',
+     name: 'Settings',
+     component: () => import('../views/Settings.vue')
    }
 ]
 
