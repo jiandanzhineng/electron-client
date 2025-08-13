@@ -620,6 +620,65 @@ this.log('成功信息', 'success') // 成功
 this.log('调试信息', 'debug')   // 调试
 ```
 
+## TTS 语音系统
+
+游戏可以使用TTS（文本转语音）功能为玩家提供语音提示和反馈。
+
+### TTS接口获取
+
+TTS接口由系统自动提供给游戏实例：
+
+```javascript
+// TTS接口在游戏启动时自动注入到 this.tts
+// 无需手动获取，直接使用即可
+```
+
+### 检查TTS支持
+
+```javascript
+// 在start方法中检查TTS是否可用
+async start(deviceManager, params) {
+  // ... 其他初始化代码
+  
+  // 检查TTS接口是否可用
+  if (this.tts) {
+    this.log('TTS接口已找到，语音提示可用', 'info')
+  } else {
+    this.log('TTS接口未找到，语音提示不可用', 'warning')
+  }
+}
+```
+
+### 播放语音
+
+```javascript
+// 创建语音播放辅助方法
+async playVoice(text) {
+  // 检查配置是否启用语音
+  if (!this.config.enableVoice) {
+    return
+  }
+  
+  // 检查TTS接口是否可用
+  if (!this.tts) {
+    return
+  }
+  
+  try {
+    await this.tts.speak(text)
+  } catch (error) {
+    this.log(`语音播放失败: ${error.message}`, 'warning')
+  }
+}
+```
+
+### 注意事项
+
+1. **异步操作**：`speak` 方法是异步的，如果需要等待语音播放完成再继续，使用 `await`
+2. **错误处理**：语音播放可能失败，建议添加 try-catch 处理
+3. **配置控制**：提供语音开关让用户可以选择是否启用语音
+4. **性能考虑**：避免频繁播放语音，以免影响游戏体验
+
 ## 计时器管理
 
 ### 游戏主计时器

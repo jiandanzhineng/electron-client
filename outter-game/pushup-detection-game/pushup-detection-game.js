@@ -23,7 +23,8 @@ export class PushupDetectionGame {
       rewardTriggerCount: 5,
       rewardTriggerProbability: 30,
       vibratorIntensity: 100,
-      vibratorDuration: 15
+      vibratorDuration: 15,
+      enableVoice: true
     }
     
     // 游戏状态
@@ -210,6 +211,12 @@ export class PushupDetectionGame {
         step: 1,
         default: 15,
         description: '跳蛋工作时间（秒）'
+      },
+      enableVoice: {
+        name: '启用语音提示',
+        type: 'boolean',
+        default: true,
+        description: '是否启用游戏过程中的语音提示'
       }
     }
   }
@@ -238,6 +245,14 @@ export class PushupDetectionGame {
     this.uiAPI = window.gameplayUI
     if (!this.uiAPI) {
       throw new Error('UI API未找到，请确保在正确的环境中运行')
+    }
+    
+    // 获取TTS接口（由gameplayService提供）
+    // 注意：TTS接口是由gameplayService在启动时直接挂载到游戏实例上的
+    if (!this.tts) {
+      this.log('TTS接口未找到，语音提示功能将不可用', 'warning')
+    } else {
+      this.log('TTS接口已找到，语音提示功能可用', 'info')
     }
     
     this.log(`俯卧撑检测训练游戏 v${this.version} 正在启动...`, 'info')
@@ -281,6 +296,9 @@ export class PushupDetectionGame {
       
       this.log(`俯卧撑检测游戏已启动，目标: ${this.config.targetCount}个，时长: ${this.config.duration}分钟`, 'success')
       this.log('请开始做俯卧撑！保持标准动作姿势', 'info')
+      
+      // 播放游戏开始语音提示
+      this.playVoice('训练开始')
       
     } catch (error) {
       this.log(`游戏启动失败: ${error.message}`, 'error')
@@ -359,6 +377,19 @@ export class PushupDetectionGame {
     
     this.log(`完成俯卧撑! 当前进度: ${this.state.completedCount}/${this.config.targetCount}`, 'success')
     
+    // 语音提示：完成第一个和后续每完成10个
+    if (this.state.completedCount === 1 || this.state.completedCount % 10 === 0) {
+      this.playVoice(`已完成${this.state.completedCount}个`)
+    }
+    
+    // 进度提醒
+    const progress = this.state.completedCount / this.config.targetCount
+    if (progress === 0.5) {
+      this.playVoice('已完成50%')
+    } else if (this.config.targetCount - this.state.completedCount === 10) {
+      this.playVoice('还差10个就完成了')
+    }
+    
     // 检查是否达到目标
     if (this.state.completedCount >= this.config.targetCount) {
       await this.endGame(true)
@@ -394,6 +425,9 @@ export class PushupDetectionGame {
       this.state.rewardCount++
       
       this.log(`触发奖励干扰! 强度: ${this.config.vibratorIntensity}, 时长: ${this.config.vibratorDuration}秒`, 'warning')
+      
+      // 播放奖励语音提示
+      this.playVoice('干的不错，奖励你一下')
       
       // 启动跳蛋
       await this.deviceManager.setDeviceProperty('vibrator_device', {
@@ -491,6 +525,9 @@ export class PushupDetectionGame {
         this.config.shockDuration + durationVariation))
       
       this.log(`触发惩罚! 强度: ${intensity.toFixed(1)}V, 时长: ${duration.toFixed(1)}秒`, 'error')
+      
+      // 播放惩罚语音提示
+      this.playVoice('快动起来')
       
       this.state.isShocking = true
       this.state.lastActionTime = Date.now() // 重置动作时间
@@ -652,6 +689,8 @@ export class PushupDetectionGame {
     
     if (completed) {
       this.log(`🎉 恭喜完成训练! 完成了${this.state.completedCount}个俯卧撑`, 'success')
+      // 播放成功完成语音提示
+      this.playVoice('恭喜完成训练，表现优秀')
     } else {
       this.log(`⏰ 时间到! 完成了${this.state.completedCount}/${this.config.targetCount}个俯卧撑 (${completionRate}%)`, 'warning')
     }
@@ -1004,6 +1043,21 @@ export class PushupDetectionGame {
     `
     
     this.uiAPI.updateUI(html)
+  }
+  
+  /**
+   * 播放语音提示
+   */
+  async playVoice(text) {
+    if (!this.config.enableVoice || !this.tts) {
+      return
+    }
+    
+    try {
+      await this.tts.speak(text)
+    } catch (error) {
+      this.log(`语音播放失败: ${error.message}`, 'warning')
+    }
   }
   
   /**

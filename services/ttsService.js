@@ -62,8 +62,11 @@ class TTSService {
   // Windows TTS
   speakWindows(text, options) {
     return new Promise((resolve, reject) => {
-      const voice = options.voice || 'Microsoft Zira Desktop';
+      const voice = options.voice || 'Microsoft Huihui Desktop';
       const rate = options.rate || 0;
+      
+      // 对文本进行Base64编码以避免中文字符问题
+      const encodedText = Buffer.from(text, 'utf8').toString('base64');
       
       const powershellScript = `
         Add-Type -AssemblyName System.Speech;
@@ -74,12 +77,17 @@ class TTSService {
         } catch {
           # Use default voice if specified voice not found
         }
-        $synth.Speak('${text.replace(/'/g, "''")}');
+        # 解码Base64文本
+        $encodedText = '${encodedText}';
+        $decodedBytes = [System.Convert]::FromBase64String($encodedText);
+        $decodedText = [System.Text.Encoding]::UTF8.GetString($decodedBytes);
+        $synth.Speak($decodedText);
         $synth.Dispose();
       `;
       
       this.currentProcess = spawn('powershell', ['-Command', powershellScript], {
-        windowsHide: true
+        windowsHide: true,
+        encoding: 'utf8'
       });
       
       this.currentProcess.on('close', (code) => {

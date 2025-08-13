@@ -678,11 +678,21 @@ class GameplayService {
     this.sendLog(`开始执行玩法启动流程...`, 'info')
     
     try {
-      // 为外部玩法提供日志接口
+      // 为外部玩法提供日志接口和TTS接口
       if (this.currentGameplay) {
         this.currentGameplay.log = (message, level = 'info') => {
           this.sendLog(`[${this.currentGameplay.title}] ${message}`, level)
         }
+        
+        // 提供TTS方法接口
+        this.currentGameplay.tts = {
+          speak: (text, options = {}) => this.speakText(text, options),
+          stop: () => this.stopTTS(),
+          checkSupport: () => this.checkTTSSupport(),
+          getVoices: () => this.getTTSVoices()
+        }
+        
+        this.sendLog('已为外部游戏提供TTS接口', 'info')
       }
       
       // 调用玩法的start方法
@@ -964,6 +974,92 @@ class GameplayService {
     } catch (error) {
       this.sendLog(`读取文件失败: ${error.message}`, 'error')
       throw error
+    }
+  }
+
+  /**
+   * TTS文本转语音
+   * @param {string} text - 要转换的文本
+   * @param {Object} options - TTS选项（可选）
+   * @param {string} options.voice - 语音名称
+   * @param {number} options.rate - 语音速度
+   * @returns {Promise<boolean>} 是否成功
+   */
+  async speakText(text, options = {}) {
+    try {
+      this.sendLog(`TTS播放: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`, 'info')
+      
+      const result = await window.electronAPI.invoke('tts-speak', text, options)
+      if (result.success) {
+        this.sendLog('TTS播放成功', 'success')
+        return true
+      } else {
+        this.sendLog(`TTS播放失败: ${result.error}`, 'error')
+        return false
+      }
+    } catch (error) {
+      this.sendLog(`TTS调用异常: ${error.message}`, 'error')
+      return false
+    }
+  }
+
+  /**
+   * 停止TTS播放
+   * @returns {Promise<boolean>} 是否成功
+   */
+  async stopTTS() {
+    try {
+      const result = await window.electronAPI.invoke('tts-stop')
+      if (result.success) {
+        this.sendLog('TTS播放已停止', 'info')
+        return true
+      } else {
+        this.sendLog(`停止TTS失败: ${result.error}`, 'error')
+        return false
+      }
+    } catch (error) {
+      this.sendLog(`停止TTS异常: ${error.message}`, 'error')
+      return false
+    }
+  }
+
+  /**
+   * 检查TTS支持状态
+   * @returns {Promise<boolean>} 是否支持TTS
+   */
+  async checkTTSSupport() {
+    try {
+      const result = await window.electronAPI.invoke('tts-check-support')
+      if (result.success) {
+        this.sendLog(`TTS支持状态: ${result.data ? '支持' : '不支持'}`, 'info')
+        return result.data
+      } else {
+        this.sendLog(`检查TTS支持失败: ${result.error}`, 'error')
+        return false
+      }
+    } catch (error) {
+      this.sendLog(`检查TTS支持异常: ${error.message}`, 'error')
+      return false
+    }
+  }
+
+  /**
+   * 获取可用的TTS语音列表
+   * @returns {Promise<Array>} 语音列表
+   */
+  async getTTSVoices() {
+    try {
+      const result = await window.electronAPI.invoke('tts-get-voices')
+      if (result.success) {
+        this.sendLog(`获取到 ${result.data.length} 个TTS语音`, 'info')
+        return result.data
+      } else {
+        this.sendLog(`获取TTS语音失败: ${result.error}`, 'error')
+        return []
+      }
+    } catch (error) {
+      this.sendLog(`获取TTS语音异常: ${error.message}`, 'error')
+      return []
     }
   }
   
