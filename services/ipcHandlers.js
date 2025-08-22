@@ -10,6 +10,7 @@ const localServerService = require('./localServerService');
 const emqxService = require('./emqxService');
 const autoUpdateService = require('./autoUpdateService');
 const ttsService = require('./ttsService');
+const sttService = require('./sttService');
 const logger = require('./logService');
 
 class IPCHandlers {
@@ -23,6 +24,7 @@ class IPCHandlers {
     mdnsService.setMainWindow(window);
     emqxService.setMainWindow(window);
     ttsService.setMainWindow(window);
+    sttService.setMainWindow(window);
   }
 
   // 初始化所有IPC处理器
@@ -34,6 +36,7 @@ class IPCHandlers {
     this.setupSystemHandlers();
     this.setupAutoUpdateHandlers();
     this.setupTTSHandlers();
+    this.setupSTTHandlers();
   }
 
   // 键盘事件处理器
@@ -89,6 +92,64 @@ class IPCHandlers {
         return { success: true, data: isSupported };
       } catch (error) {
         logger.error('检查TTS支持失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }
+
+  // STT相关处理器
+  setupSTTHandlers() {
+    // 设置API Token
+    ipcMain.handle('stt-set-token', async (event, token) => {
+      try {
+        sttService.setApiToken(token);
+        return { success: true };
+      } catch (error) {
+        logger.error('设置STT Token失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取API Token
+    ipcMain.handle('stt-get-token', async (event) => {
+      try {
+        const token = sttService.getApiToken();
+        return { success: true, data: token };
+      } catch (error) {
+        logger.error('获取STT Token失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 检查配置状态
+    ipcMain.handle('stt-check-config', async (event) => {
+      try {
+        const isConfigured = sttService.isConfigured();
+        return { success: true, data: isConfigured };
+      } catch (error) {
+        logger.error('检查STT配置失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 语音转文本
+    ipcMain.handle('stt-transcribe', async (event, audioData) => {
+      try {
+        const text = await sttService.transcribe(audioData);
+        return { success: true, data: text };
+      } catch (error) {
+        logger.error('语音转文本失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 测试连接
+    ipcMain.handle('stt-test-connection', async (event) => {
+      try {
+        const isConnected = await sttService.testConnection();
+        return { success: true, data: isConnected };
+      } catch (error) {
+        logger.error('STT连接测试失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });

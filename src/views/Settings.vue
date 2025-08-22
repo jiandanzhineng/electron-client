@@ -96,6 +96,96 @@
         </div>
       </div>
 
+      <!-- STT设置区域 -->
+      <div class="settings-section">
+        <h2>🎤 STT (语音转文本) 设置</h2>
+        
+        <!-- API Token设置 -->
+        <div class="setting-item">
+          <label for="stt-token">API Token:</label>
+          <div class="token-input-group">
+             <input 
+               id="stt-token" 
+               type="password" 
+               v-model="sttToken" 
+               placeholder="请输入SiliconFlow API Token..."
+               :disabled="loading"
+             >
+             <button 
+               @click="saveSttToken" 
+               :disabled="loading || !sttToken.trim()"
+               class="btn btn-primary btn-sm"
+             >
+               💾 保存
+             </button>
+             <button 
+               @click="testConnection" 
+               :disabled="loading || !sttConfigured"
+               class="btn btn-info btn-sm"
+             >
+               🔗 测试连接
+             </button>
+           </div>
+           
+           <!-- 状态提示 -->
+           <div v-if="statusMessage" class="status-message" :class="statusType">
+             {{ statusMessage }}
+           </div>
+        </div>
+
+        <!-- 配置状态 -->
+        <div class="setting-item">
+          <label>配置状态:</label>
+          <span :class="['status', sttConfigured ? 'configured' : 'not-configured']">
+            {{ sttConfigured ? '✅ 已配置' : '❌ 未配置' }}
+          </span>
+        </div>
+
+        <div v-if="sttConfigured">
+          <!-- 录音测试区域 -->
+           <div class="setting-item">
+             <label>录音测试:</label>
+             <div class="recording-controls">
+               <button 
+                 @click="startRecording" 
+                 :disabled="loading || isRecording || isTranscribing"
+                 class="btn btn-primary"
+               >
+                 <span v-if="isRecording">🔴 录音中...</span>
+                 <span v-else>🎤 开始录音</span>
+               </button>
+               <button 
+                 @click="stopRecording" 
+                 :disabled="loading || !isRecording || isTranscribing"
+                 class="btn btn-secondary"
+               >
+                 ⏹️ 结束录音
+               </button>
+             </div>
+           </div>
+
+          <!-- 转录结果 -->
+          <div class="setting-item" v-if="transcriptionResult">
+            <label>转录结果:</label>
+            <div class="transcription-result">
+              {{ transcriptionResult }}
+            </div>
+          </div>
+
+          <!-- 转录状态 -->
+          <div class="setting-item" v-if="isTranscribing">
+            <div class="transcribing-status">
+              🔄 正在转录中，请稍候...
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="not-configured-message">
+          <p>⚠️ 请先配置API Token才能使用语音转文本功能。</p>
+          <p>您可以在SiliconFlow官网获取API Token。</p>
+        </div>
+      </div>
+
       <!-- 其他设置区域可以在这里添加 -->
       <div class="settings-section">
         <h2>🔧 其他设置</h2>
@@ -105,10 +195,6 @@
       </div>
     </div>
 
-    <!-- 状态消息 -->
-    <div v-if="statusMessage" :class="['status-message', statusType]">
-      {{ statusMessage }}
-    </div>
   </div>
 </template>
 
@@ -125,6 +211,15 @@ const loading = ref(false)
 const isSpeaking = ref(false)
 const statusMessage = ref('')
 const statusType = ref('info') // 'info', 'success', 'error'
+
+// STT相关响应式数据
+const sttToken = ref('')
+const sttConfigured = ref(false)
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+const transcriptionResult = ref('')
+const mediaRecorder = ref(null)
+const audioChunks = ref([])
 
 // 显示状态消息
 const showStatus = (message, type = 'info', duration = 3000) => {
@@ -229,9 +324,128 @@ const stopTTS = async () => {
   }
 }
 
+// STT相关方法
+const loadSttConfig = async () => {
+  try {
+    const tokenResult = await window.electronAPI.invoke('stt-get-token')
+    if (tokenResult.success && tokenResult.data) {
+      sttToken.value = tokenResult.data
+    }
+    
+    const configResult = await window.electronAPI.invoke('stt-check-config')
+    if (configResult.success) {
+      sttConfigured.value = configResult.data
+    }
+  } catch (error) {
+    console.error('加载STT配置失败:', error)
+  }
+}
+
+const saveSttToken = async () => {
+  if (!sttToken.value.trim()) {
+    showStatus('请输入有效的API Token', 'error')
+    return
+  }
+
+  try {
+    loading.value = true
+    const result = await window.electronAPI.invoke('stt-set-token', sttToken.value.trim())
+    if (result.success) {
+      sttConfigured.value = true
+      showStatus('API Token保存成功', 'success')
+    } else {
+      showStatus('保存失败: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('保存STT Token失败:', error)
+    showStatus('保存失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder.value = new MediaRecorder(stream)
+    audioChunks.value = []
+    
+    mediaRecorder.value.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.value.push(event.data)
+      }
+    }
+    
+    mediaRecorder.value.onstop = async () => {
+      const audioBlob = new Blob(audioChunks.value, { type: 'audio/wav' })
+      await transcribeAudio(audioBlob)
+      
+      // 停止所有音频轨道
+      stream.getTracks().forEach(track => track.stop())
+    }
+    
+    mediaRecorder.value.start()
+    isRecording.value = true
+    transcriptionResult.value = ''
+    showStatus('开始录音...', 'info')
+  } catch (error) {
+    console.error('开始录音失败:', error)
+    showStatus('无法访问麦克风，请检查权限设置', 'error')
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder.value && isRecording.value) {
+    mediaRecorder.value.stop()
+    isRecording.value = false
+    showStatus('录音结束，正在转录...', 'info')
+  }
+}
+
+const transcribeAudio = async (audioBlob) => {
+  try {
+    isTranscribing.value = true
+    
+    // 将Blob转换为ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    
+    const result = await window.electronAPI.invoke('stt-transcribe', uint8Array)
+    if (result.success) {
+      transcriptionResult.value = result.data
+      showStatus('转录完成', 'success')
+    } else {
+      showStatus('转录失败: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('转录失败:', error)
+    showStatus('转录失败', 'error')
+  } finally {
+    isTranscribing.value = false
+  }
+}
+
+const testConnection = async () => {
+  try {
+    loading.value = true
+    const result = await window.electronAPI.invoke('stt-test-connection')
+    if (result.success && result.data) {
+      showStatus('连接测试成功', 'success')
+    } else {
+      showStatus('连接测试失败，请检查Token是否正确', 'error')
+    }
+  } catch (error) {
+    console.error('连接测试失败:', error)
+    showStatus('连接测试失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
 // 组件挂载时初始化
 onMounted(() => {
   checkTTSSupport()
+  loadSttConfig()
 })
 
 // 组件卸载时清理
@@ -415,16 +629,85 @@ onUnmounted(() => {
   color: #721c24;
 }
 
-.not-supported-message {
-  background-color: #fff3cd;
+.not-supported-message,
+.not-configured-message {
+  background: #fff3cd;
   border: 1px solid #ffeaa7;
   border-radius: 4px;
   padding: 15px;
+  margin-top: 15px;
+}
+
+.not-supported-message p,
+.not-configured-message p {
+  margin: 5px 0;
   color: #856404;
 }
 
-.not-supported-message p {
-  margin: 5px 0;
+/* STT相关样式 */
+.token-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.token-input-group input {
+  flex: 1;
+}
+
+.recording-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.transcription-result {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 10px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.transcribing-status {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  padding: 10px;
+  color: #1976d2;
+  text-align: center;
+  font-weight: 500;
+}
+
+.status.configured {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.status.not-configured {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.btn-info {
+  background: #17a2b8;
+  color: white;
+  border: 1px solid #17a2b8;
+}
+
+.btn-info:hover {
+  background: #138496;
+  border-color: #117a8b;
+}
+
+.btn-info:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .placeholder-text {
@@ -435,14 +718,12 @@ onUnmounted(() => {
 }
 
 .status-message {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 12px 20px;
+  margin-top: 10px;
+  padding: 8px 12px;
   border-radius: 4px;
-  font-weight: 600;
-  z-index: 1000;
-  animation: slideIn 0.3s ease;
+  font-weight: 500;
+  font-size: 14px;
+  animation: fadeIn 0.3s ease;
 }
 
 .status-message.info {
@@ -463,14 +744,14 @@ onUnmounted(() => {
   border: 1px solid #f5c6cb;
 }
 
-@keyframes slideIn {
+@keyframes fadeIn {
   from {
-    transform: translateX(100%);
     opacity: 0;
+    transform: translateY(-10px);
   }
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
