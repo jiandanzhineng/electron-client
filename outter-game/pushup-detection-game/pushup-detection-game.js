@@ -116,7 +116,7 @@ export class PushupDetectionGame {
       downThreshold: {
         name: '下降阈值',
         type: 'number',
-        min: 5,
+        min: 1,
         max: 30,
         step: 1,
         default: 8,
@@ -125,10 +125,10 @@ export class PushupDetectionGame {
       upThreshold: {
         name: '上升阈值',
         type: 'number',
-        min: 20,
+        min: 10,
         max: 50,
         step: 1,
-        default: 18,
+        default: 15,
         description: '身体上升到此距离以上视为"起"（厘米）'
       },
       idleTimeLimit: {
