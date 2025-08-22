@@ -1,6 +1,6 @@
 {
   "name": "easysmart-electron",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "main": "main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
