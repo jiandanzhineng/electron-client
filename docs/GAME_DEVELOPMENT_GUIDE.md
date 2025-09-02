@@ -679,6 +679,171 @@ async playVoice(text) {
 3. **配置控制**：提供语音开关让用户可以选择是否启用语音
 4. **性能考虑**：避免频繁播放语音，以免影响游戏体验
 
+## AI功能调用
+
+游戏可以使用AI功能，包括语音识别（STT）和大语言模型对话（LLM），为玩家提供智能交互体验。
+
+### 语音识别 (Speech-to-Text)
+
+#### 基本调用
+
+```javascript
+// 直接调用语音识别API
+const result = await window.electronAPI.invoke('game-speech-to-text', {
+  audioData: audioData,  // Uint8Array格式的音频数据
+  options: {
+    timeout: 30000  // 超时时间（毫秒）
+  }
+})
+
+if (result.success) {
+  console.log('识别结果:', result.text)
+} else {
+  console.error('识别失败:', result.error)
+}
+```
+
+#### 完整录音流程
+
+```javascript
+// 开始录音
+async startRecording() {
+  this.audioChunks = []
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  this.mediaRecorder = new MediaRecorder(stream)
+  
+  this.mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      this.audioChunks.push(event.data)
+    }
+  }
+  
+  this.mediaRecorder.start()
+  this.state.isRecording = true
+}
+
+// 停止录音并识别
+async stopRecording() {
+  this.mediaRecorder.stop()
+  this.mediaRecorder.stream.getTracks().forEach(track => track.stop())
+  
+  this.mediaRecorder.onstop = async () => {
+    const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' })
+    const audioData = new Uint8Array(await audioBlob.arrayBuffer())
+    
+    const result = await window.electronAPI.invoke('game-speech-to-text', {
+      audioData: audioData,
+      options: { timeout: 30000 }
+    })
+    
+    if (result.success) {
+      this.handleSpeechResult(result.text)
+    }
+    
+    this.state.isRecording = false
+  }
+}
+```
+
+### LLM对话 (Large Language Model)
+
+#### 基本调用
+
+```javascript
+// 调用LLM对话API
+const result = await window.electronAPI.invoke('game-chat-llm', {
+  message: '你好，请介绍一下自己',
+  options: {
+    timeout: 30000,
+    model: 'Qwen/Qwen2.5-7B-Instruct',
+    max_tokens: 1000,
+    temperature: 0.7
+  }
+})
+
+if (result.success) {
+  // 注意：需要提取content字段
+  const responseText = result.response.content
+  console.log('LLM回复:', responseText)
+} else {
+  console.error('LLM调用失败:', result.error)
+}
+```
+
+#### 智能对话示例
+
+```javascript
+async chatWithAI(userMessage) {
+  const result = await window.electronAPI.invoke('game-chat-llm', {
+    message: userMessage,
+    options: {
+      model: 'Qwen/Qwen2.5-7B-Instruct',
+      max_tokens: 200,
+      temperature: 0.8
+    }
+  })
+  
+  if (result.success) {
+    const aiResponse = result.response.content
+    this.displayMessage(aiResponse)
+    
+    // 可选：使用TTS播放回复
+    if (this.tts) {
+      await this.tts.speak(aiResponse)
+    }
+  }
+}
+```
+
+### 配置参数
+
+```javascript
+parameters = {
+  sttTimeout: {
+    name: '语音识别超时时间',
+    type: 'number',
+    min: 5000,
+    max: 60000,
+    default: 30000,
+    description: '语音识别超时时间（毫秒）'
+  },
+  
+  llmModel: {
+    name: 'LLM模型',
+    type: 'select',
+    options: [
+      { value: 'Qwen/Qwen2.5-7B-Instruct', label: 'Qwen2.5-7B' },
+      { value: 'Qwen/Qwen2.5-14B-Instruct', label: 'Qwen2.5-14B' },
+      { value: 'Qwen/Qwen2.5-32B-Instruct', label: 'Qwen2.5-32B' }
+    ],
+    default: 'Qwen/Qwen2.5-7B-Instruct',
+    description: '选择LLM模型'
+  },
+  
+  temperature: {
+    name: '温度参数',
+    type: 'number',
+    min: 0.1,
+    max: 2.0,
+    step: 0.1,
+    default: 0.7,
+    description: 'LLM生成随机性控制'
+  }
+}
+```
+
+### 重要注意事项
+
+1. **LLM响应格式**：`result.response.content` 包含实际文本内容
+2. **空语音处理**：语音识别对空内容返回空字符串，不会报错
+3. **权限要求**：语音识别需要麦克风权限
+4. **资源清理**：及时停止录音流，避免资源泄漏
+5. **错误处理**：所有调用都应检查 `result.success` 状态
+
+### 参考示例
+
+完整的AI功能使用示例请参考：`outter-game/ai-test-game/ai-test-game.js`
+
 ## 计时器管理
 
 ### 游戏主计时器

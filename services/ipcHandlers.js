@@ -11,6 +11,8 @@ const emqxService = require('./emqxService');
 const autoUpdateService = require('./autoUpdateService');
 const ttsService = require('./ttsService');
 const sttService = require('./sttService');
+const llmService = require('./llmService');
+const aiService = require('./aiService');
 const logger = require('./logService');
 
 class IPCHandlers {
@@ -25,6 +27,8 @@ class IPCHandlers {
     emqxService.setMainWindow(window);
     ttsService.setMainWindow(window);
     sttService.setMainWindow(window);
+    llmService.setMainWindow(window);
+    aiService.setMainWindow(window);
   }
 
   // 初始化所有IPC处理器
@@ -37,6 +41,8 @@ class IPCHandlers {
     this.setupAutoUpdateHandlers();
     this.setupTTSHandlers();
     this.setupSTTHandlers();
+    this.setupLLMHandlers();
+    this.setupAIHandlers();
   }
 
   // 键盘事件处理器
@@ -150,6 +156,75 @@ class IPCHandlers {
         return { success: true, data: isConnected };
       } catch (error) {
         logger.error('STT连接测试失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }
+
+  // LLM相关处理器
+  setupLLMHandlers() {
+    // 设置API Key
+    ipcMain.handle('llm-set-api-key', async (event, apiKey) => {
+      try {
+        llmService.setApiKey(apiKey);
+        return { success: true };
+      } catch (error) {
+        logger.error('设置LLM API Key失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取API Key
+    ipcMain.handle('llm-get-api-key', async (event) => {
+      try {
+        const apiKey = llmService.getApiKey();
+        return { success: true, data: apiKey };
+      } catch (error) {
+        logger.error('获取LLM API Key失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 检查配置状态
+    ipcMain.handle('llm-check-config', async (event) => {
+      try {
+        const isConfigured = llmService.isConfigured();
+        return { success: true, data: isConfigured };
+      } catch (error) {
+        logger.error('检查LLM配置失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取可用模型列表
+    ipcMain.handle('llm-get-models', async (event) => {
+      try {
+        const models = llmService.getAvailableModels();
+        return { success: true, data: models };
+      } catch (error) {
+        logger.error('获取LLM模型列表失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // LLM对话
+    ipcMain.handle('llm-chat', async (event, message, options) => {
+      try {
+        const result = await llmService.chat(message, options);
+        return result;
+      } catch (error) {
+        logger.error('LLM对话失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 测试连接
+    ipcMain.handle('llm-test-connection', async (event) => {
+      try {
+        const result = await llmService.testConnection();
+        return result;
+      } catch (error) {
+        logger.error('LLM连接测试失败', 'ipc', error);
         return { success: false, error: error.message };
       }
     });
@@ -559,6 +634,67 @@ class IPCHandlers {
     });
   }
 
+  // AI相关处理器
+  setupAIHandlers() {
+    // 测试AI连接
+    ipcMain.handle('ai-test-connection', async (event) => {
+      try {
+        const result = await aiService.testConnection();
+        return result;
+      } catch (error) {
+        logger.error('AI连接测试失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // AI对话
+    ipcMain.handle('ai-chat', async (event, data) => {
+      try {
+        const { message, model } = data;
+        const result = await aiService.chat(message, { model });
+        return result;
+      } catch (error) {
+        logger.error('AI对话失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取可用模型列表
+    ipcMain.handle('ai-get-models', async (event) => {
+      try {
+        const models = await aiService.getAvailableModels();
+        return { success: true, data: models };
+      } catch (error) {
+        logger.error('获取AI模型列表失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 游戏API - 语音识别
+    ipcMain.handle('game-speech-to-text', async (event, data) => {
+      try {
+        const { audioData, options = {} } = data;
+        const result = await aiService.speechToText(audioData, options);
+        return result;
+      } catch (error) {
+        logger.error('游戏语音识别失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 游戏API - LLM对话
+    ipcMain.handle('game-chat-llm', async (event, data) => {
+      try {
+        const { message, options = {} } = data;
+        const result = await aiService.chatWithLLM(message, options);
+        return result;
+      } catch (error) {
+        logger.error('游戏LLM调用失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }
+
   // 清理资源
   cleanup() {
     mqttService.disconnect();
@@ -566,6 +702,7 @@ class IPCHandlers {
     localServerService.cleanup();
     emqxService.cleanup();
     ttsService.cleanup();
+    aiService.cleanup();
   }
 }
 
