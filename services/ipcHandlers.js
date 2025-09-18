@@ -13,6 +13,7 @@ const ttsService = require('./ttsService');
 const sttService = require('./sttService');
 const llmService = require('./llmService');
 const aiService = require('./aiService');
+const blufiService = require('./blufiService');
 const logger = require('./logService');
 
 class IPCHandlers {
@@ -43,6 +44,7 @@ class IPCHandlers {
     this.setupSTTHandlers();
     this.setupLLMHandlers();
     this.setupAIHandlers();
+    this.setupBlufiHandlers();
   }
 
   // 键盘事件处理器
@@ -695,6 +697,49 @@ class IPCHandlers {
     });
   }
 
+  // BluFi配网处理器
+  setupBlufiHandlers() {
+    ipcMain.handle('blufi-scan-devices', async () => {
+      try {
+        const devices = await blufiService.scanDevices();
+        return { success: true, devices };
+      } catch (error) {
+        logger.error('BluFi扫描设备失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('blufi-connect-device', async (event, deviceId) => {
+      try {
+        const result = await blufiService.connectDevice(deviceId);
+        return { success: true, result };
+      } catch (error) {
+        logger.error('BluFi连接设备失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('blufi-configure-wifi', async (event, config) => {
+      try {
+        const result = await blufiService.configureWifi(config);
+        return { success: true, result };
+      } catch (error) {
+        logger.error('BluFi配置WiFi失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('blufi-disconnect', async () => {
+      try {
+        await blufiService.disconnect();
+        return { success: true };
+      } catch (error) {
+        logger.error('BluFi断开连接失败', 'ipc', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }
+
   // 清理资源
   cleanup() {
     mqttService.disconnect();
@@ -703,6 +748,7 @@ class IPCHandlers {
     emqxService.cleanup();
     ttsService.cleanup();
     aiService.cleanup();
+    blufiService.cleanup();
   }
 }
 
