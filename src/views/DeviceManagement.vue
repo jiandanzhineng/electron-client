@@ -63,9 +63,14 @@
                 </td>
                 <td>{{ formatLastReport(device.lastReport) }}</td>
                 <td>
-                  <button @click.stop="removeDevice(device.id)" class="btn btn-danger btn-sm">
-                    删除
-                  </button>
+                  <div class="action-buttons">
+                    <button @click.stop="openMonitorModal(device)" class="btn btn-primary btn-sm">
+                      监看数据
+                    </button>
+                    <button @click.stop="removeDevice(device.id)" class="btn btn-danger btn-sm">
+                      删除
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="deviceStore.devices.length === 0">
@@ -254,17 +259,27 @@
       </div>
     </div>
   </div>
+
+  <!-- 监控弹窗 -->
+  <DeviceMonitorModal 
+    :visible="showMonitorModal"
+    :device-info="monitorDevice"
+    @close="closeMonitorModal"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useDeviceStore } from '../stores/deviceStore'
 import { useServiceStore } from '../stores/serviceStore'
+import DeviceMonitorModal from '../components/DeviceMonitorModal.vue'
 
 const deviceStore = useDeviceStore()
 const serviceStore = useServiceStore()
 
 const showConfigModal = ref(false)
+const showMonitorModal = ref(false)
+const monitorDevice = ref(null)
 
 // 编辑相关状态
 const isEditing = ref(false)
@@ -298,6 +313,16 @@ function removeDevice(deviceId) {
 
 function closeConfigModal() {
   showConfigModal.value = false
+}
+
+function openMonitorModal(device) {
+  monitorDevice.value = device
+  showMonitorModal.value = true
+}
+
+function closeMonitorModal() {
+  showMonitorModal.value = false
+  monitorDevice.value = null
 }
 
 function editWifiConfig() {
@@ -1031,5 +1056,40 @@ function getBatteryLevelClass(battery) {
   justify-content: center;
   gap: 15px;
   margin-top: 20px;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.action-buttons .btn {
+  min-width: 80px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-buttons .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.action-buttons .btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.action-buttons .btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-buttons .btn-danger:hover {
+  background-color: #c82333;
 }
 </style>

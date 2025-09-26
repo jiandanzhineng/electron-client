@@ -1,0 +1,1 @@
+针对无法用node直接运行的electron应用。完成修改后让用户检查效果，而不是自行npm run dev
