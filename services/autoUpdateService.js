@@ -18,10 +18,14 @@ class AutoUpdateService {
 
   setupAutoUpdater() {
     // 设置更新服务器URL（GitHub releases）
+    // autoUpdater.setFeedURL({
+    //   provider: 'github',
+    //   owner: 'jiandanzhineng',
+    //   repo: 'electron-client'
+    // });
     autoUpdater.setFeedURL({
-      provider: 'github',
-      owner: 'jiandanzhineng',
-      repo: 'electron-client'
+      provider: 'generic',
+      url: 'https://update.ezsapi.top/'
     });
 
     // 自动下载更新
