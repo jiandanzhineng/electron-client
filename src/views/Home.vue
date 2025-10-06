@@ -18,8 +18,16 @@
       </div>
       
       <div class="info-card">
-        <h3>🚀 交流QQ群</h3>
-        <p>970326066 欢迎大家交流使用心得 开发更多玩法</p>
+        <h3>🚀 交流社群</h3>
+        <p>QQ群970326066 欢迎大家交流使用心得 开发更多玩法</p>
+        <div class="social-buttons">
+          <a href="https://t.me/jiandanzhineng" target="_blank" rel="noopener noreferrer" @click="openInBrowser" class="social-btn tg-btn">
+            📱 TG频道
+          </a>
+          <a href="https://x.com/lufashi181845" target="_blank" rel="noopener noreferrer" @click="openInBrowser" class="social-btn twitter-btn">
+            🐦 推特
+          </a>
+        </div>
       </div>
       
       <div class="info-card">
@@ -288,6 +296,50 @@ onMounted(async () => {
   color: rgba(255, 255, 255, 0.9);
   font-size: 16px;
   font-weight: 500;
+}
+
+.social-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.tg-btn {
+  background: linear-gradient(135deg, #0088cc 0%, #229ed9 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.3);
+}
+
+.tg-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4);
+  background: linear-gradient(135deg, #229ed9 0%, #0088cc 100%);
+}
+
+.twitter-btn {
+  background: linear-gradient(135deg, #1da1f2 0%, #0d8bd9 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(29, 161, 242, 0.3);
+}
+
+.twitter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(29, 161, 242, 0.4);
+  background: linear-gradient(135deg, #0d8bd9 0%, #1da1f2 100%);
 }
 
 /* 淘宝店铺卡片特殊样式 */

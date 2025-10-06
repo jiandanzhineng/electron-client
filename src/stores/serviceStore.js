@@ -288,10 +288,12 @@ export const useServiceStore = defineStore('service', {
           return
         }
         
-        // 导入设备store和设备类型配置
+        // 导入设备store、监控store和设备类型配置
         const { useDeviceStore } = await import('./deviceStore')
+        const { useMonitoringStore } = await import('./monitoringStore')
         const { getDeviceTypeName } = await import('../config/deviceTypes')
         const deviceStore = useDeviceStore()
+        const monitoringStore = useMonitoringStore()
         
         // 检查设备是否已存在
         let device = deviceStore.getDeviceById(deviceId)
@@ -328,6 +330,18 @@ export const useServiceStore = defineStore('service', {
             }
             deviceStore.saveDevices()
             deviceStore.updateDeviceTable()
+          }
+        }
+        
+        // 处理监控数据（对于report和update消息）
+        if (payload.method === 'report' || payload.method === 'update') {
+          // 检查是否有该设备的活跃监控会话
+          const hasActiveSession = Array.from(monitoringStore.activeSessions.values())
+            .some(session => session.deviceId === deviceId)
+          
+          if (hasActiveSession) {
+            console.log('ServiceStore调用监控Store处理消息:', { topic: message.topic, payload })
+            monitoringStore.handleMqttMessage(message)
           }
         }
         

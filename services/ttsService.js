@@ -85,12 +85,15 @@ class TTSService {
         $synth.Dispose();
       `;
       
+      logger.info(`TTS调用信息 - 语音: ${voice}, 语速: ${rate}, 文本: ${text}`);
+      
       this.currentProcess = spawn('powershell', ['-Command', powershellScript], {
         windowsHide: true,
         encoding: 'utf8'
       });
       
       this.currentProcess.on('close', (code) => {
+        logger.info(`TTS PowerShell进程结束，退出代码: ${code}`);
         this.currentProcess = null;
         if (code === 0) {
           resolve();
@@ -100,6 +103,7 @@ class TTSService {
       });
       
       this.currentProcess.on('error', (error) => {
+        logger.error(`TTS PowerShell进程错误: ${error.message}`);
         this.currentProcess = null;
         reject(error);
       });

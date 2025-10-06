@@ -96,52 +96,59 @@
         </div>
       </div>
 
-      <!-- STT设置区域 -->
+      <!-- AI功能设置区域 -->
       <div class="settings-section">
-        <h2>🎤 STT (语音转文本) 设置</h2>
+        <h2>🤖 AI功能设置</h2>
         
-        <!-- API Token设置 -->
-        <div class="setting-item">
-          <label for="stt-token">API Token:</label>
-          <div class="token-input-group">
-             <input 
-               id="stt-token" 
-               type="password" 
-               v-model="sttToken" 
-               placeholder="请输入SiliconFlow API Token..."
-               :disabled="loading"
-             >
-             <button 
-               @click="saveSttToken" 
-               :disabled="loading || !sttToken.trim()"
-               class="btn btn-primary btn-sm"
-             >
-               💾 保存
-             </button>
-             <button 
-               @click="testConnection" 
-               :disabled="loading || !sttConfigured"
-               class="btn btn-info btn-sm"
-             >
-               🔗 测试连接
-             </button>
-           </div>
-           
-           <!-- 状态提示 -->
-           <div v-if="statusMessage" class="status-message" :class="statusType">
-             {{ statusMessage }}
-           </div>
-        </div>
+        <!-- 统一API Token配置 -->
+        <div class="ai-subsection">
+          <h3>🔑 API Token 配置</h3>
+          <div class="setting-item">
+            <label for="ai-token">硅基流动 API Token:</label>
+            <div class="token-input-group">
+              <input 
+                id="ai-token" 
+                type="text" 
+                v-model="aiToken" 
+                placeholder="请输入硅基流动API Token（用于STT和LLM功能）..."
+                :disabled="loading"
+              >
+              <button 
+                @click="saveAiToken" 
+                :disabled="loading || !aiToken.trim()"
+                class="btn btn-primary btn-sm"
+              >
+                💾 保存
+              </button>
+              <button 
+                @click="testAiConnection" 
+                :disabled="loading || !aiConfigured"
+                class="btn btn-info btn-sm"
+              >
+                🔗 测试连接
+              </button>
+            </div>
+            
+            <!-- 状态提示 -->
+            <div v-if="aiStatusMessage" class="status-message" :class="aiStatusType">
+              {{ aiStatusMessage }}
+            </div>
+          </div>
 
-        <!-- 配置状态 -->
-        <div class="setting-item">
-          <label>配置状态:</label>
-          <span :class="['status', sttConfigured ? 'configured' : 'not-configured']">
-            {{ sttConfigured ? '✅ 已配置' : '❌ 未配置' }}
-          </span>
+          <!-- 配置状态 -->
+          <div class="setting-item">
+            <label>配置状态:</label>
+            <span :class="['status', aiConfigured ? 'configured' : 'not-configured']">
+              {{ aiConfigured ? '✅ 已配置' : '❌ 未配置' }}
+            </span>
+          </div>
         </div>
+        
+        <!-- STT设置子区域 -->
+        <div class="ai-subsection" v-if="aiConfigured">
+          <h3>🎤 STT (语音转文本)</h3>
 
-        <div v-if="sttConfigured">
+        <div>
           <!-- 录音测试区域 -->
            <div class="setting-item">
              <label>录音测试:</label>
@@ -160,6 +167,21 @@
                  class="btn btn-secondary"
                >
                  ⏹️ 结束录音
+               </button>
+               <button 
+                 @click="playRecording" 
+                 :disabled="loading || isRecording || isTranscribing || !hasRecording || isPlaying"
+                 class="btn btn-info"
+               >
+                 <span v-if="isPlaying">🔊 播放中...</span>
+                 <span v-else>▶️ 播放录音</span>
+               </button>
+               <button 
+                 @click="stopPlayback" 
+                 :disabled="loading || !isPlaying"
+                 class="btn btn-warning"
+               >
+                 ⏸️ 停止播放
                </button>
              </div>
            </div>
@@ -180,9 +202,88 @@
           </div>
         </div>
 
-        <div v-else class="not-configured-message">
-          <p>⚠️ 请先配置API Token才能使用语音转文本功能。</p>
-          <p>您可以在SiliconFlow官网获取API Token。</p>
+        </div>
+        <!-- STT设置子区域结束 -->
+        
+        <!-- LLM设置子区域 -->
+        <div class="ai-subsection" v-if="aiConfigured">
+          <h3>🧠 LLM (大语言模型)</h3>
+          
+          <div>
+            <!-- 模型选择 -->
+            <div class="setting-item">
+              <label for="llm-model-select">模型选择:</label>
+              <select 
+                id="llm-model-select" 
+                v-model="selectedLlmModel" 
+                :disabled="loading"
+              >
+                <option 
+                  v-for="model in availableLlmModels" 
+                  :key="model" 
+                  :value="model"
+                >
+                  {{ model }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 对话测试区域 -->
+            <div class="setting-item">
+              <label for="llm-test-message">对话测试:</label>
+              <textarea 
+                id="llm-test-message" 
+                v-model="llmTestMessage" 
+                placeholder="输入要测试的消息..."
+                rows="3"
+                :disabled="loading || isLlmChatting"
+              ></textarea>
+            </div>
+
+            <!-- 测试按钮 -->
+            <div class="setting-item">
+              <div class="button-group">
+                <button 
+                  @click="testLlmChat" 
+                  :disabled="loading || isLlmChatting || !llmTestMessage.trim()"
+                  class="btn btn-primary"
+                >
+                  <span v-if="isLlmChatting">🤖 对话中...</span>
+                  <span v-else>💬 发送消息</span>
+                </button>
+                <button 
+                  @click="clearLlmChat" 
+                  :disabled="loading"
+                  class="btn btn-secondary"
+                >
+                  🗑️ 清空对话
+                </button>
+              </div>
+            </div>
+
+            <!-- 对话结果 -->
+            <div class="setting-item" v-if="llmChatResult">
+              <label>AI回复:</label>
+              <div class="chat-result">
+                <div class="chat-message user-message">
+                  <strong>用户:</strong> {{ llmLastUserMessage }}
+                </div>
+                <div class="chat-message ai-message">
+                  <strong>AI:</strong> {{ llmChatResult }}
+                </div>
+                <div v-if="llmChatDuration" class="chat-info">
+                  耗时: {{ llmChatDuration }}秒 | 模型: {{ selectedLlmModel }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <!-- LLM设置子区域结束 -->
+        
+        <div v-if="!aiConfigured" class="not-configured-message">
+          <p>⚠️ 请先配置API Token才能使用AI功能（STT和LLM）。</p>
+          <p>您可以在硅基流动官网获取API Token。</p>
         </div>
       </div>
 
@@ -200,6 +301,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useAiStore } from '@/stores/aiStore'
+
+// 初始化Pinia store
+const aiStore = useAiStore()
 
 // 响应式数据
 const ttsSupported = ref(false)
@@ -212,14 +317,31 @@ const isSpeaking = ref(false)
 const statusMessage = ref('')
 const statusType = ref('info') // 'info', 'success', 'error'
 
+// AI配置现在通过aiStore管理，创建计算属性来访问
+const aiToken = ref('')
+const aiConfigured = ref(false)
+const aiStatusMessage = ref('')
+const aiStatusType = ref('info')
+
 // STT相关响应式数据
-const sttToken = ref('')
-const sttConfigured = ref(false)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 const transcriptionResult = ref('')
 const mediaRecorder = ref(null)
 const audioChunks = ref([])
+const recordedAudioBlob = ref(null)
+const hasRecording = ref(false)
+const isPlaying = ref(false)
+const audioPlayer = ref(null)
+
+// LLM相关响应式数据
+const selectedLlmModel = ref('Qwen/Qwen2.5-7B-Instruct')
+const availableLlmModels = ref([])
+const llmTestMessage = ref('你好，请介绍一下你自己。')
+const isLlmChatting = ref(false)
+const llmChatResult = ref('')
+const llmLastUserMessage = ref('')
+const llmChatDuration = ref(null)
 
 // 显示状态消息
 const showStatus = (message, type = 'info', duration = 3000) => {
@@ -227,6 +349,15 @@ const showStatus = (message, type = 'info', duration = 3000) => {
   statusType.value = type
   setTimeout(() => {
     statusMessage.value = ''
+  }, duration)
+}
+
+// 显示AI状态消息
+const showAiStatus = (message, type = 'info', duration = 3000) => {
+  aiStatusMessage.value = message
+  aiStatusType.value = type
+  setTimeout(() => {
+    aiStatusMessage.value = ''
   }, duration)
 }
 
@@ -324,41 +455,57 @@ const stopTTS = async () => {
   }
 }
 
-// STT相关方法
-const loadSttConfig = async () => {
+// AI统一配置方法
+const loadAiConfig = async () => {
   try {
-    const tokenResult = await window.electronAPI.invoke('stt-get-token')
-    if (tokenResult.success && tokenResult.data) {
-      sttToken.value = tokenResult.data
-    }
-    
-    const configResult = await window.electronAPI.invoke('stt-check-config')
-    if (configResult.success) {
-      sttConfigured.value = configResult.data
-    }
+    await aiStore.loadConfig()
+    // 同步store状态到本地响应式变量
+    aiToken.value = aiStore.apiToken
+    aiConfigured.value = aiStore.isConfigured
   } catch (error) {
-    console.error('加载STT配置失败:', error)
+    console.error('加载AI配置失败:', error)
   }
 }
 
-const saveSttToken = async () => {
-  if (!sttToken.value.trim()) {
-    showStatus('请输入有效的API Token', 'error')
+const saveAiToken = async () => {
+  if (!aiToken.value.trim()) {
+    showAiStatus('请输入有效的API Token', 'error')
     return
   }
 
   try {
     loading.value = true
-    const result = await window.electronAPI.invoke('stt-set-token', sttToken.value.trim())
+    aiStore.setApiToken(aiToken.value.trim())
+    aiConfigured.value = aiStore.isConfigured
+    showAiStatus('API Token保存成功', 'success')
+    // 重新加载LLM模型列表
+    await loadLlmModels()
+  } catch (error) {
+    console.error('保存AI Token失败:', error)
+    showAiStatus('保存失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+const testAiConnection = async () => {
+  try {
+    loading.value = true
+    console.log('[Settings] 开始测试AI连接')
+    const result = await aiStore.testConnection()
+    console.log('[Settings] AI连接测试结果:', result)
+    
     if (result.success) {
-      sttConfigured.value = true
-      showStatus('API Token保存成功', 'success')
+      showAiStatus('连接测试成功', 'success')
     } else {
-      showStatus('保存失败: ' + result.error, 'error')
+      const errorMsg = result.error || '连接测试失败，请检查API Token是否正确'
+      console.error('[Settings] AI连接测试失败:', errorMsg)
+      showAiStatus(`连接测试失败: ${errorMsg}`, 'error')
     }
   } catch (error) {
-    console.error('保存STT Token失败:', error)
-    showStatus('保存失败', 'error')
+    console.error('[Settings] AI连接测试异常:', error)
+    console.error('[Settings] 错误堆栈:', error.stack)
+    showAiStatus(`连接测试异常: ${error.message}`, 'error')
   } finally {
     loading.value = false
   }
@@ -378,6 +525,8 @@ const startRecording = async () => {
     
     mediaRecorder.value.onstop = async () => {
       const audioBlob = new Blob(audioChunks.value, { type: 'audio/wav' })
+      recordedAudioBlob.value = audioBlob
+      hasRecording.value = true
       await transcribeAudio(audioBlob)
       
       // 停止所有音频轨道
@@ -425,33 +574,151 @@ const transcribeAudio = async (audioBlob) => {
   }
 }
 
-const testConnection = async () => {
+const playRecording = () => {
+  if (!recordedAudioBlob.value) {
+    showStatus('没有可播放的录音', 'warning')
+    return
+  }
+  
   try {
-    loading.value = true
-    const result = await window.electronAPI.invoke('stt-test-connection')
-    if (result.success && result.data) {
-      showStatus('连接测试成功', 'success')
-    } else {
-      showStatus('连接测试失败，请检查Token是否正确', 'error')
+    // 创建音频URL
+    const audioUrl = URL.createObjectURL(recordedAudioBlob.value)
+    
+    // 创建音频播放器
+    audioPlayer.value = new Audio(audioUrl)
+    
+    // 设置播放结束事件
+    audioPlayer.value.onended = () => {
+      isPlaying.value = false
+      URL.revokeObjectURL(audioUrl)
+      audioPlayer.value = null
+      showStatus('录音播放完成', 'success')
+    }
+    
+    // 设置播放错误事件
+    audioPlayer.value.onerror = (error) => {
+      console.error('播放录音失败:', error)
+      isPlaying.value = false
+      URL.revokeObjectURL(audioUrl)
+      audioPlayer.value = null
+      showStatus('播放录音失败', 'error')
+    }
+    
+    // 开始播放
+    audioPlayer.value.play()
+    isPlaying.value = true
+    showStatus('开始播放录音...', 'info')
+  } catch (error) {
+    console.error('播放录音失败:', error)
+    showStatus('播放录音失败', 'error')
+  }
+}
+
+const stopPlayback = () => {
+  if (audioPlayer.value) {
+    audioPlayer.value.pause()
+    audioPlayer.value.currentTime = 0
+    
+    // 清理资源
+    const audioUrl = audioPlayer.value.src
+    if (audioUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(audioUrl)
+    }
+    
+    audioPlayer.value = null
+    isPlaying.value = false
+    showStatus('停止播放录音', 'info')
+  }
+}
+
+
+
+// LLM相关方法
+const loadLlmModels = async () => {
+  try {
+    const modelsResult = await window.electronAPI.invoke('ai-get-models')
+    if (modelsResult.success) {
+      availableLlmModels.value = modelsResult.data
     }
   } catch (error) {
-    console.error('连接测试失败:', error)
-    showStatus('连接测试失败', 'error')
-  } finally {
-    loading.value = false
+    console.error('加载LLM模型失败:', error)
   }
+}
+
+const testLlmChat = async () => {
+  if (!llmTestMessage.value.trim()) {
+    showAiStatus('请输入测试消息', 'warning')
+    return
+  }
+  
+  try {
+    isLlmChatting.value = true
+    llmLastUserMessage.value = llmTestMessage.value
+    showAiStatus('正在对话...', 'info')
+    
+    console.log('[Settings] 开始LLM对话测试')
+    console.log('[Settings] 测试消息:', llmTestMessage.value)
+    console.log('[Settings] 选中的模型:', selectedLlmModel.value)
+    
+    const options = {
+      model: selectedLlmModel.value,
+      maxTokens: 1000
+    }
+    
+    console.log('[Settings] 对话选项:', options)
+    const result = await aiStore.sendChatMessage(llmTestMessage.value, options)
+    console.log('[Settings] LLM对话结果:', result)
+    
+    if (result && result.success) {
+      llmChatResult.value = result.data.content
+      llmChatDuration.value = result.data.duration?.toFixed(2)
+      showAiStatus('对话完成', 'success')
+      console.log('[Settings] LLM对话成功，内容长度:', result.data.content?.length)
+    } else {
+      const errorMsg = result?.error || '未知错误'
+      console.error('[Settings] LLM对话失败:', errorMsg)
+      console.error('[Settings] 完整错误信息:', result)
+      showAiStatus('对话失败: ' + errorMsg, 'error')
+    }
+  } catch (error) {
+    console.error('[Settings] LLM对话异常:', error)
+    console.error('[Settings] 错误堆栈:', error.stack)
+    showAiStatus('对话异常: ' + error.message, 'error')
+  } finally {
+    isLlmChatting.value = false
+  }
+}
+
+const clearLlmChat = () => {
+  llmChatResult.value = ''
+  llmLastUserMessage.value = ''
+  llmChatDuration.value = null
+  llmTestMessage.value = '你好，请介绍一下你自己。'
+  showAiStatus('对话已清空', 'info')
 }
 
 // 组件挂载时初始化
 onMounted(() => {
   checkTTSSupport()
-  loadSttConfig()
+  loadAiConfig()
+  loadLlmModels()
 })
 
 // 组件卸载时清理
 onUnmounted(() => {
   if (isSpeaking.value) {
     stopTTS()
+  }
+  
+  // 清理音频播放器
+  if (audioPlayer.value) {
+    stopPlayback()
+  }
+  
+  // 清理录音资源
+  if (recordedAudioBlob.value) {
+    recordedAudioBlob.value = null
+    hasRecording.value = false
   }
 })
 </script>
@@ -710,6 +977,24 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+.btn-warning {
+  background: #ffc107;
+  color: #212529;
+  border: 1px solid #ffc107;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #e0a800;
+  border-color: #d39e00;
+}
+
+.btn-warning:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .placeholder-text {
   color: #7f8c8d;
   font-style: italic;
@@ -753,6 +1038,58 @@ onUnmounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* AI功能设置相关样式 */
+.ai-subsection {
+  margin-bottom: 25px;
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.ai-subsection h3 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 16px;
+  border-bottom: 1px solid #ecf0f1;
+  padding-bottom: 8px;
+}
+
+/* LLM对话结果样式 */
+.chat-result {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 10px;
+}
+
+.chat-message {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  word-wrap: break-word;
+}
+
+.user-message {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+.ai-message {
+  background: #f3e5f5;
+  border-left: 3px solid #9c27b0;
+}
+
+.chat-info {
+  font-size: 12px;
+  color: #666;
+  text-align: right;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
 }
 
 /* 响应式设计 */

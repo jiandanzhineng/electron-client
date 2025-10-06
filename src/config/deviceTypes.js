@@ -6,6 +6,7 @@ export const deviceTypeMap = {
   'ZIDONGSUO': '自动锁',
   'TD01': '偏轴电机控制器',
   'DIANJI': '电脉冲设备',
+  'QIYA': '气压传感器',
   'other': '其他'
 }
 

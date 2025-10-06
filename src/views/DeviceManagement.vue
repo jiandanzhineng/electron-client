@@ -3,11 +3,11 @@
     <div class="header">
       <h1>设备管理</h1>
       <div class="header-actions">
-        <button @click="refreshDevices" class="btn btn-secondary">
-          🔄 刷新设备
+        <button @click="clearAllDevices" class="btn btn-danger">
+          🗑️ 删除所有设备
         </button>
-        <button @click="showAddModal = true" class="btn btn-primary">
-          ➕ 添加设备
+        <button @click="showConfigModal = true" class="btn btn-primary">
+          📶 设备配网
         </button>
       </div>
     </div>
@@ -63,9 +63,14 @@
                 </td>
                 <td>{{ formatLastReport(device.lastReport) }}</td>
                 <td>
-                  <button @click.stop="removeDevice(device.id)" class="btn btn-danger btn-sm">
-                    删除
-                  </button>
+                  <div class="action-buttons">
+                    <button @click.stop="openMonitorModal(device)" class="btn btn-primary btn-sm">
+                      监看数据
+                    </button>
+                    <button @click.stop="removeDevice(device.id)" class="btn btn-danger btn-sm">
+                      删除
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="deviceStore.devices.length === 0">
@@ -153,73 +158,128 @@
       </div>
     </div>
 
-    <!-- 添加设备模态框 -->
-    <div v-if="showAddModal" class="modal-overlay" @click="closeModal">
-      <div class="modal" @click.stop>
+    <!-- 设备配网模态框 -->
+    <div v-if="showConfigModal" class="modal-overlay" @click="closeConfigModal">
+      <div class="modal config-modal" @click.stop>
         <div class="modal-header">
-          <h3>添加设备</h3>
-          <button @click="closeModal" class="close-btn">×</button>
+          <h3>设备配网</h3>
+          <button @click="closeConfigModal" class="close-btn">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="addDevice">
-            <div class="form-group">
-              <label for="deviceName">设备名称:</label>
-              <input 
-                id="deviceName" 
-                v-model="newDevice.name" 
-                type="text" 
-                required 
-                placeholder="请输入设备名称"
-              >
+          <div v-if="!deviceStore.isConfiguring" class="config-setup">
+            <div class="wifi-config-section">
+              <h4>WiFi配置</h4>
+              <div class="form-group">
+                <label for="wifiSsid">WiFi名称 (SSID):</label>
+                <input 
+                  id="wifiSsid" 
+                  v-model="deviceStore.wifiConfig.ssid" 
+                  type="text" 
+                  required 
+                  placeholder="请输入WiFi名称"
+                >
+              </div>
+              <div class="form-group">
+                <label for="wifiPassword">WiFi密码:</label>
+                <input 
+                  id="wifiPassword" 
+                  v-model="deviceStore.wifiConfig.password" 
+                  type="password" 
+                  required 
+                  placeholder="请输入WiFi密码"
+                >
+              </div>
+              <div class="wifi-actions">
+                <button @click="editWifiConfig" class="btn btn-secondary btn-sm">
+                  修改配置
+                </button>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="deviceId">设备ID:</label>
-              <input 
-                id="deviceId" 
-                v-model="newDevice.id" 
-                type="text" 
-                required 
-                placeholder="请输入设备ID"
-              >
-            </div>
-            <div class="form-group">
-              <label for="deviceType">设备类型:</label>
-              <select id="deviceType" v-model="newDevice.type" required>
-                <option value="">请选择设备类型</option>
-                <option v-for="(name, type) in deviceStore.deviceTypeMap" :key="type" :value="type">
-                  {{ name }}
-                </option>
-              </select>
-            </div>
-            <div class="modal-actions">
-              <button type="button" @click="closeModal" class="btn btn-secondary">
+            
+            <div class="config-actions">
+              <button @click="closeConfigModal" class="btn btn-secondary">
                 取消
               </button>
-              <button type="submit" class="btn btn-primary">
-                添加
+              <button @click="startDeviceConfig" class="btn btn-primary">
+                开始配网
               </button>
             </div>
-          </form>
+          </div>
+          
+          <div v-else-if="!deviceStore.configSuccess" class="config-progress">
+            <div class="progress-header">
+              <h4>正在配网...约需要15秒</h4>
+              <div class="countdown">
+                剩余时间: {{ deviceStore.configCountdown }}秒
+              </div>
+            </div>
+            
+            <div class="progress-content">
+              <div class="scanning-animation">
+                <div class="spinner"></div>
+                <p>正在扫描BluFi设备...</p>
+              </div>
+              
+              <div class="config-log">
+                <div v-for="(log, index) in deviceStore.configLogs" :key="index" class="log-item">
+                  {{ log }}
+                </div>
+              </div>
+            </div>
+            
+            <div class="progress-actions">
+              <button @click="stopDeviceConfig" class="btn btn-danger">
+                停止配网
+              </button>
+            </div>
+          </div>
+          
+          <div v-else class="config-success">
+            <div class="success-header">
+              <div class="success-icon">✅</div>
+              <h4>配网成功</h4>
+            </div>
+            
+            <div class="config-log">
+              <div v-for="(log, index) in deviceStore.configLogs" :key="index" class="log-item">
+                {{ log }}
+              </div>
+            </div>
+            
+            <div class="success-actions">
+              <button @click="restartConfig" class="btn btn-primary">
+                再次配网
+              </button>
+              <button @click="finishConfig" class="btn btn-secondary">
+                结束配网
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 监控弹窗 -->
+  <DeviceMonitorModal 
+    :visible="showMonitorModal"
+    :device-info="monitorDevice"
+    @close="closeMonitorModal"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useDeviceStore } from '../stores/deviceStore'
 import { useServiceStore } from '../stores/serviceStore'
+import DeviceMonitorModal from '../components/DeviceMonitorModal.vue'
 
 const deviceStore = useDeviceStore()
 const serviceStore = useServiceStore()
 
-const showAddModal = ref(false)
-const newDevice = ref({
-  name: '',
-  id: '',
-  type: ''
-})
+const showConfigModal = ref(false)
+const showMonitorModal = ref(false)
+const monitorDevice = ref(null)
 
 // 编辑相关状态
 const isEditing = ref(false)
@@ -239,8 +299,10 @@ function selectDevice(deviceId) {
   deviceStore.selectDevice(deviceId)
 }
 
-function refreshDevices() {
-  deviceStore.refreshDevices()
+function clearAllDevices() {
+  if (confirm('确定要删除所有设备吗？此操作不可恢复！')) {
+    deviceStore.clearAllDevices()
+  }
 }
 
 function removeDevice(deviceId) {
@@ -249,26 +311,45 @@ function removeDevice(deviceId) {
   }
 }
 
-function addDevice() {
-  if (newDevice.value.name && newDevice.value.id && newDevice.value.type) {
-    // 检查设备ID是否已存在
-    if (deviceStore.getDeviceById(newDevice.value.id)) {
-      alert('设备ID已存在，请使用其他ID')
-      return
-    }
-    
-    deviceStore.addDevice(newDevice.value)
-    closeModal()
-  }
+function closeConfigModal() {
+  showConfigModal.value = false
 }
 
-function closeModal() {
-  showAddModal.value = false
-  newDevice.value = {
-    name: '',
-    id: '',
-    type: ''
+function openMonitorModal(device) {
+  monitorDevice.value = device
+  showMonitorModal.value = true
+}
+
+function closeMonitorModal() {
+  showMonitorModal.value = false
+  monitorDevice.value = null
+}
+
+function editWifiConfig() {
+  // 允许用户修改WiFi配置
+  console.log('编辑WiFi配置')
+}
+
+function startDeviceConfig() {
+  if (!deviceStore.wifiConfig.ssid || !deviceStore.wifiConfig.password) {
+    alert('请输入WiFi名称和密码')
+    return
   }
+  
+  deviceStore.startDeviceConfiguration()
+}
+
+function stopDeviceConfig() {
+  deviceStore.stopDeviceConfiguration()
+}
+
+function restartConfig() {
+  deviceStore.restartConfiguration()
+}
+
+function finishConfig() {
+  deviceStore.finishConfiguration()
+  closeConfigModal()
 }
 
 function formatLastReport(timestamp) {
@@ -841,5 +922,174 @@ function getBatteryLevelClass(battery) {
   background-color: #e2e3e5;
   color: #6c757d;
   border: 1px solid #d6d8db;
+}
+
+/* 配网模态框样式 */
+.config-modal {
+  max-width: 600px;
+}
+
+.wifi-config-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.wifi-config-section h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+}
+
+.wifi-actions {
+  margin-top: 15px;
+  text-align: right;
+}
+
+.config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.config-progress {
+  text-align: center;
+}
+
+.progress-header {
+  margin-bottom: 30px;
+}
+
+.progress-header h4 {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+}
+
+.countdown {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e74c3c;
+}
+
+.progress-content {
+  margin-bottom: 30px;
+}
+
+.scanning-animation {
+  margin-bottom: 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.scanning-animation p {
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.config-log {
+  background: #f8f9fa;
+  border: 1px solid #e1e8ed;
+  border-radius: 4px;
+  padding: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.log-item {
+  padding: 2px 0;
+  font-size: 14px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.progress-actions {
+  display: flex;
+  justify-content: center;
+}
+
+/* 配网成功页面样式 */
+.config-success {
+  text-align: center;
+}
+
+.success-header {
+  margin-bottom: 30px;
+}
+
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.success-header h4 {
+  margin: 0 0 10px 0;
+  color: #27ae60;
+  font-size: 24px;
+}
+
+.success-header p {
+  color: #7f8c8d;
+  margin: 0;
+  font-size: 16px;
+}
+
+.success-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.action-buttons .btn {
+  min-width: 80px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-buttons .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.action-buttons .btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.action-buttons .btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-buttons .btn-danger:hover {
+  background-color: #c82333;
 }
 </style>
