@@ -485,6 +485,10 @@ class BluFiService {
       this.sendLog('配网已手动停止');
     }
   }
+
+  cleanup() {
+    this.sendLog('BluFi服务已清理');
+  }
 }
 
 const blufiService = new BluFiService();

@@ -10,6 +10,7 @@ const { spawn } = require('child_process');
 const { promisify } = require('util');
 const AdmZip = require('adm-zip');
 const { app } = require('electron');
+const logService = require('./logService');
 
 class EMQXService {
   constructor() {
@@ -45,15 +46,37 @@ class EMQXService {
    * @param {string} level 日志级别
    */
   sendLogToGUI(message, level = 'info') {
-    if (this.mainWindow && this.mainWindow.webContents) {
-      this.mainWindow.webContents.send('server-log', {
-        timestamp: new Date().toISOString(),
-        level: level,
-        message: message,
-        service: 'EMQX'
-      });
+    try {
+      if (this.mainWindow && 
+          this.mainWindow.webContents && 
+          !this.mainWindow.isDestroyed() && 
+          !this.mainWindow.webContents.isDestroyed()) {
+        this.mainWindow.webContents.send('server-log', {
+          timestamp: new Date().toISOString(),
+          level: level,
+          message: message,
+          service: 'EMQX'
+        });
+      }
+    } catch (error) {
+      // 窗口已销毁时静默处理，避免程序退出时的错误
     }
-    console.log(message);
+    
+    // 同时通过logService输出日志
+    switch (level) {
+      case 'error':
+        logService.error(message, 'EMQX');
+        break;
+      case 'warn':
+        logService.warn(message, 'EMQX');
+        break;
+      case 'debug':
+        logService.debug(message, 'EMQX');
+        break;
+      default:
+        logService.info(message, 'EMQX');
+        break;
+    }
   }
 
   /**
@@ -65,7 +88,6 @@ class EMQXService {
   async downloadFile(url, filePath) {
     return new Promise((resolve, reject) => {
       const message = `开始下载 EMQX 服务: ${url}`;
-      console.log(message);
       this.sendLogToGUI(message, 'info');
       
       const file = fs.createWriteStream(filePath);
@@ -96,7 +118,6 @@ class EMQXService {
             // 每10%报告一次进度，避免日志过多
             if (progress - lastProgressReport >= 10) {
               const progressMsg = `EMQX 下载进度: ${progress}%`;
-              console.log(progressMsg);
               this.sendLogToGUI(progressMsg, 'info');
               lastProgressReport = Math.floor(progress / 10) * 10;
             }
@@ -108,7 +129,6 @@ class EMQXService {
         file.on('finish', () => {
           file.close();
           const completeMsg = 'EMQX 服务下载完成';
-          console.log(completeMsg);
           this.sendLogToGUI(completeMsg, 'success');
           resolve();
         });
@@ -132,7 +152,6 @@ class EMQXService {
   async extractEmqx() {
     try {
       const extractMsg = `开始解压 EMQX 服务到: ${this.emqxWorkDir}`;
-      console.log(extractMsg);
       this.sendLogToGUI(extractMsg, 'info');
       
       // 确保目标目录存在
@@ -169,11 +188,9 @@ class EMQXService {
       }
       
       const completeMsg = 'EMQX 服务解压完成';
-      console.log(completeMsg);
       this.sendLogToGUI(completeMsg, 'success');
     } catch (error) {
       const errorMsg = `解压 EMQX 服务失败: ${error.message}`;
-      console.error(errorMsg);
       this.sendLogToGUI(errorMsg, 'error');
       throw error;
     }
@@ -186,7 +203,6 @@ class EMQXService {
   async downloadAndInstallEmqx() {
     try {
       const startMsg = '检测到 EMQX 服务未安装，开始下载和安装...';
-      console.log(startMsg);
       this.sendLogToGUI(startMsg, 'info');
       
       // 确保tools目录存在
@@ -207,7 +223,6 @@ class EMQXService {
       }
       
       const successMsg = 'EMQX 服务安装成功';
-      console.log(successMsg);
       this.sendLogToGUI(successMsg, 'success');
       return {
         success: true,
@@ -215,7 +230,6 @@ class EMQXService {
       };
     } catch (error) {
       const errorMsg = `下载和安装 EMQX 服务失败: ${error.message}`;
-      console.error(errorMsg);
       this.sendLogToGUI(errorMsg, 'error');
       return {
         success: false,
@@ -232,7 +246,7 @@ class EMQXService {
     try {
       // 检查EMQX是否已安装
       if (!this.isEmqxInstalled()) {
-        console.log('EMQX 服务未安装，开始下载和安装...');
+        this.sendLogToGUI('EMQX 服务未安装，开始下载和安装...', 'info');
         const installResult = await this.downloadAndInstallEmqx();
         if (!installResult.success) {
           return {
@@ -242,7 +256,7 @@ class EMQXService {
         }
       }
       
-      console.log('Starting EMQX broker at:', this.emqxPath);
+      this.sendLogToGUI(`Starting EMQX broker at: ${this.emqxPath}`, 'info');
       
       // 启动emqx
       const emqxProcess = spawn(this.emqxPath, ['start'], {
@@ -264,9 +278,9 @@ class EMQXService {
         });
         
         emqxProcess.on('close', async (code) => {
-          console.log(`EMQX start process exited with code ${code}`);
-          console.log('Output:', output);
-          console.log('Error output:', errorOutput);
+          this.sendLogToGUI(`EMQX start process exited with code ${code}`, 'info');
+          this.sendLogToGUI(`Output: ${output}`, 'info');
+          this.sendLogToGUI(`Error output: ${errorOutput}`, 'info');
           
           // 等待一段时间后检查状态
           setTimeout(async () => {
@@ -281,7 +295,7 @@ class EMQXService {
         });
         
         emqxProcess.on('error', (error) => {
-          console.error('Failed to start EMQX:', error);
+          this.sendLogToGUI(`Failed to start EMQX: ${error.message}`, 'error');
           resolve({
             success: false,
             error: error.message
@@ -289,7 +303,7 @@ class EMQXService {
         });
       });
     } catch (error) {
-      console.error('Error starting MQTT broker:', error);
+      this.sendLogToGUI(`Error starting MQTT broker: ${error.message}`, 'error');
       return {
         success: false,
         error: error.message
@@ -303,7 +317,7 @@ class EMQXService {
    */
   async stopBroker() {
     try {
-      console.log('Stopping EMQX broker at:', this.emqxPath);
+      this.sendLogToGUI(`Stopping EMQX broker at: ${this.emqxPath}`, 'info');
       
       const emqxProcess = spawn(this.emqxPath, ['stop'], {
         cwd: this.emqxWorkDir,
@@ -324,9 +338,9 @@ class EMQXService {
         });
         
         emqxProcess.on('close', async (code) => {
-          console.log(`EMQX stop process exited with code ${code}`);
-          console.log('Output:', output);
-          console.log('Error output:', errorOutput);
+          this.sendLogToGUI(`EMQX stop process exited with code ${code}`, 'info');
+          this.sendLogToGUI(`Output: ${output}`, 'info');
+          this.sendLogToGUI(`Error output: ${errorOutput}`, 'info');
           
           // 等待一段时间后检查状态
           setTimeout(async () => {
@@ -341,7 +355,7 @@ class EMQXService {
         });
         
         emqxProcess.on('error', (error) => {
-          console.error('Failed to stop EMQX:', error);
+          this.sendLogToGUI(`Failed to stop EMQX: ${error.message}`, 'error');
           resolve({
             success: false,
             error: error.message
@@ -349,7 +363,7 @@ class EMQXService {
         });
       });
     } catch (error) {
-      console.error('Error stopping MQTT broker:', error);
+      this.sendLogToGUI(`Error stopping MQTT broker: ${error.message}`, 'error');
       return {
         success: false,
         error: error.message
@@ -363,7 +377,7 @@ class EMQXService {
    */
   async checkStatus() {
     try {
-      console.log('Checking EMQX status at:', this.emqxCtlPath);
+      this.sendLogToGUI(`Checking EMQX status at: ${this.emqxCtlPath}`, 'info');
       
       return new Promise((resolve) => {
         const statusProcess = spawn(this.emqxCtlPath, ['status'], {
@@ -384,9 +398,9 @@ class EMQXService {
         });
         
         statusProcess.on('close', (code) => {
-          console.log(`EMQX status check exited with code ${code}`);
-          console.log('Status output:', output);
-          console.log('Status error:', errorOutput);
+          this.sendLogToGUI(`EMQX status check exited with code ${code}`, 'info');
+          this.sendLogToGUI(`Status output: ${output}`, 'info');
+          this.sendLogToGUI(`Status error: ${errorOutput}`, 'info');
           
           const result = output || errorOutput;
           let running = false;
@@ -412,7 +426,7 @@ class EMQXService {
         });
         
         statusProcess.on('error', (error) => {
-          console.error('Failed to check EMQX status:', error);
+          this.sendLogToGUI(`Failed to check EMQX status: ${error.message}`, 'error');
           resolve({
             running: false,
             status: 'error',
@@ -421,7 +435,7 @@ class EMQXService {
         });
       });
     } catch (error) {
-      console.error('Error checking MQTT broker status:', error);
+      this.sendLogToGUI(`Error checking MQTT broker status: ${error.message}`, 'error');
       return {
         running: false,
         status: 'error',
@@ -436,7 +450,7 @@ class EMQXService {
    */
   async restartBroker() {
     try {
-      console.log('Restarting EMQX broker...');
+      this.sendLogToGUI('Restarting EMQX broker...', 'info');
       
       // 先停止
       const stopResult = await this.stopBroker();
@@ -459,7 +473,7 @@ class EMQXService {
         error: startResult.error
       };
     } catch (error) {
-      console.error('Error restarting MQTT broker:', error);
+      this.sendLogToGUI(`Error restarting MQTT broker: ${error.message}`, 'error');
       return {
         success: false,
         error: error.message
@@ -471,7 +485,7 @@ class EMQXService {
    * 清理资源
    */
   cleanup() {
-    console.log('Cleaning up EMQX service...');
+    this.sendLogToGUI('Cleaning up EMQX service...', 'info');
     // 这里可以添加清理逻辑，比如强制停止进程等
   }
 }
