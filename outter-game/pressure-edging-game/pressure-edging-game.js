@@ -83,6 +83,13 @@ export class PressureEdgingGame {
         name: "电击设备",
         required: false,
         description: "压力过高时的警示电击"
+      },
+      {
+        logicalId: "auto_lock",
+        type: "ZIDONGSUO",
+        name: "自动锁设备",
+        required: false,
+        description: "游戏开始时锁定，结束时解锁"
       }
     ]
   }
@@ -317,6 +324,15 @@ export class PressureEdgingGame {
         this.log('电击设备已初始化', 'info')
       }
       
+      // 初始化自动锁设备（如果存在）
+      const autoLockDevice = this.deviceManager.deviceMap.get('auto_lock')
+      if (autoLockDevice && autoLockDevice.connected) {
+        await this.deviceManager.setDeviceProperty('auto_lock', {
+          open: 1  // 初始化时解锁状态
+        })
+        this.log('自动锁设备已初始化', 'info')
+      }
+      
     } catch (error) {
       this.log(`设备初始化失败: ${error.message}`, 'error')
       throw error
@@ -541,6 +557,9 @@ export class PressureEdgingGame {
    * 启动游戏逻辑
    */
   startGameplay() {
+    // 锁定自动锁设备
+    this.lockAutoLockDevice()
+    
     // 启动游戏计时器
     this.startGameTimer()
     
@@ -1144,8 +1163,45 @@ export class PressureEdgingGame {
       // 停止电击
       await this.stopShock()
       
+      // 解锁自动锁设备
+      await this.unlockAutoLockDevice()
+      
     } catch (error) {
       this.log(`停止设备失败: ${error.message}`, 'error')
+    }
+  }
+  
+  /**
+   * 锁定自动锁设备
+   */
+  async lockAutoLockDevice() {
+    try {
+      const autoLockDevice = this.deviceManager.deviceMap.get('auto_lock')
+      if (autoLockDevice && autoLockDevice.connected) {
+        await this.deviceManager.setDeviceProperty('auto_lock', {
+          open: 0  // 0表示锁定
+        })
+        this.log('自动锁设备已锁定', 'info')
+      }
+    } catch (error) {
+      this.log(`自动锁设备锁定失败: ${error.message}`, 'warning')
+    }
+  }
+  
+  /**
+   * 解锁自动锁设备
+   */
+  async unlockAutoLockDevice() {
+    try {
+      const autoLockDevice = this.deviceManager.deviceMap.get('auto_lock')
+      if (autoLockDevice && autoLockDevice.connected) {
+        await this.deviceManager.setDeviceProperty('auto_lock', {
+          open: 1  // 1表示解锁
+        })
+        this.log('自动锁设备已解锁', 'info')
+      }
+    } catch (error) {
+      this.log(`自动锁设备解锁失败: ${error.message}`, 'warning')
     }
   }
   
