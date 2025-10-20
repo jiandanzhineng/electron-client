@@ -62,10 +62,15 @@ class BluFiService {
   // 初始化蓝牙
   async initBluetooth() {
     return new Promise((resolve, reject) => {
+      if (!noble) {
+        reject(new Error('蓝牙库不可用'));
+        return;
+      }
       const timeout = setTimeout(() => {
         reject(new Error('蓝牙初始化超时'));
-      }, 5000);
+      }, 15000);
 
+      noble.removeAllListeners?.('stateChange');
       noble.on('stateChange', (state) => {
         clearTimeout(timeout);
         if (state === 'poweredOn') {
@@ -88,59 +93,50 @@ class BluFiService {
 
   // 扫描设备
   async scanDevices() {
-    return new Promise((resolve) => {
-      this.sendLog('🔍 开始扫描BluFi设备...');
-      this.discoveredDevices = [];
-      
-      // 如果noble不可用，使用模拟模式
-      if (!noble) {
-        this.sendLog('⚠️ 蓝牙库不可用，使用模拟模式');
-        setTimeout(() => {
-          const mockDevice = {
-            id: 'mock-esp32-001',
-            name: 'ESP32-BLUFI-DEMO',
-            rssi: -45,
-            peripheral: { uuid: 'mock-uuid', address: 'mock-address' }
-          };
-          this.discoveredDevices.push(mockDevice);
-          this.sendLog(`📱 发现模拟设备: ${mockDevice.name}`);
-          
-          const serializableDevices = [{
-            id: mockDevice.id,
-            name: mockDevice.name,
-            rssi: mockDevice.rssi,
-            uuid: 'mock-uuid',
-            address: 'mock-address'
-          }];
-          resolve(serializableDevices);
-        }, 2000);
-        return;
-      }
-      
+    this.sendLog('🔍 开始扫描BluFi设备...');
+    this.discoveredDevices = [];
+
+    await this.initBluetooth();
+    if (!noble || noble.state !== 'poweredOn') {
+      throw new Error('蓝牙未开启或不可用');
+    }
+
+    return new Promise((resolve, reject) => {
       const onDiscover = (peripheral) => {
         const name = peripheral.advertisement.localName || '未知设备';
-        
-        if (name.includes('BLUFI') || name.includes('ESP32')) {
+        if (name?.includes('BLUFI') || name?.includes('ESP32')) {
           const device = {
             id: peripheral.id,
-            name: name,
+            name,
             rssi: peripheral.rssi,
-            peripheral: peripheral
+            peripheral
           };
-          
           this.discoveredDevices.push(device);
           this.sendLog(`📱 发现设备: ${name} (${peripheral.id}) 信号强度: ${peripheral.rssi}dBm`);
         }
       };
 
       noble.on('discover', onDiscover);
-      noble.startScanning([], false);
+      try {
+        noble.startScanning([], false, (error) => {
+          if (error) {
+            noble.removeListener('discover', onDiscover);
+            this.sendLog(`❌ 扫描启动失败: ${error.message}`);
+            reject(error);
+            return;
+          }
+        });
+      } catch (err) {
+        noble.removeListener('discover', onDiscover);
+        this.sendLog(`❌ 扫描调用异常: ${err.message}`);
+        reject(err);
+        return;
+      }
 
       setTimeout(() => {
-        noble.stopScanning();
+        try { noble.stopScanning(); } catch (_) {}
         noble.removeListener('discover', onDiscover);
         this.sendLog(`🔍 扫描完成，共发现 ${this.discoveredDevices.length} 个BluFi设备`);
-        // 返回可序列化的设备信息
         const serializableDevices = this.discoveredDevices.map(device => ({
           id: device.id,
           name: device.name,
@@ -155,77 +151,45 @@ class BluFiService {
 
   // 连接设备
   async connectDevice(deviceId) {
+    await this.initBluetooth();
+    if (!noble || noble.state !== 'poweredOn') {
+      throw new Error('蓝牙未开启或不可用');
+    }
     return new Promise((resolve, reject) => {
-      // 如果传入的是对象，提取ID；如果是字符串，直接使用
       const id = typeof deviceId === 'string' ? deviceId : deviceId.id;
-      
       this.sendLog(`🔗 正在连接设备: ${id}`);
-      
-      this.sequence = -1; // 重置序列号
-      
-      // 模拟模式
-      if (!noble || id.startsWith('mock-')) {
-        this.sendLog('⚠️ 使用模拟连接模式');
-        setTimeout(() => {
-          this.sendLog(`✅ 模拟设备连接成功: ${id}`);
-          
-          // 存储模拟连接信息
-          this.currentConnection = {
-            device: { id, name: id },
-            writeChar: { uuid: 'mock-write' },
-            notifyChar: { uuid: 'mock-notify' }
-          };
-          
-          resolve({ 
-            success: true,
-            deviceId: id,
-            deviceName: id
-          });
-        }, 1000);
-        return;
-      }
-      
-      // 根据设备ID查找原始peripheral对象
+      this.sequence = -1;
+
       const device = this.discoveredDevices.find(d => d.id === id);
       if (!device) {
         reject(new Error('设备未找到，请重新扫描'));
         return;
       }
-      
+
       device.peripheral.connect((error) => {
         if (error) {
           reject(error);
           return;
         }
-
         this.sendLog(`✅ 设备连接成功: ${device.name}`);
-        
-        // 发现服务
         device.peripheral.discoverServices(['ffff'], (error, services) => {
           if (error) {
             reject(error);
             return;
           }
-
           if (services.length === 0) {
             reject(new Error('未找到BluFi服务'));
             return;
           }
-
           this.sendLog(`🔧 发现BluFi服务`);
-          
-          // 发现特征值
           services[0].discoverCharacteristics([], (error, characteristics) => {
             if (error) {
               reject(error);
               return;
             }
-
             this.sendLog(`📡 发现 ${characteristics.length} 个特征值`);
-            
             let writeChar = null;
             let notifyChar = null;
-            
             characteristics.forEach(char => {
               if (char.uuid === 'ff01') {
                 writeChar = char;
@@ -235,23 +199,10 @@ class BluFiService {
                 this.sendLog(`✅ 找到通知特征值: ff02`);
               }
             });
-
             if (writeChar && notifyChar) {
               this.sendLog(`🎉 设备连接完成，所有特征值已找到`);
-              
-              // 将连接信息存储在服务内部
-              this.currentConnection = {
-                device,
-                writeChar,
-                notifyChar
-              };
-              
-              // 只返回简单的成功状态
-              resolve({ 
-                success: true,
-                deviceId: device.id,
-                deviceName: device.name
-              });
+              this.currentConnection = { device, writeChar, notifyChar };
+              resolve({ success: true, deviceId: device.id, deviceName: device.name });
             } else {
               reject(new Error('未找到必要的特征值'));
             }
@@ -353,49 +304,24 @@ class BluFiService {
   // WiFi配网
   async configureWifi(config) {
     this.sendLog('🌐 开始WiFi配网...');
-    
     if (!this.currentConnection) {
       throw new Error('没有活动的设备连接');
     }
-    
     const { writeChar } = this.currentConnection;
     const { ssid, password } = config;
-    
-    // 模拟模式
-    if (!noble || writeChar.uuid === 'mock-write') {
-      this.sendLog('⚠️ 使用模拟配网模式');
-      this.sendLog(`📡 模拟发送SSID: ${ssid}`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      this.sendLog(`🔐 模拟发送密码: ${'*'.repeat(password.length)}`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      this.sendLog('🔗 模拟发送连接WiFi命令');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      this.sendLog('✅ 模拟WiFi配网成功');
-      return;
-    }
-    
-    // 1. 设置操作模式为Station
     this.sendLog('📡 设置WiFi模式为Station');
     await this.sendCtrlFrame(writeChar, this.CTRL_SUBTYPE.SET_OP_MODE, new Uint8Array([this.WIFI_MODE.STATION]));
     await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // 2. 发送SSID
     this.sendLog(`📡 发送SSID: ${ssid}`);
     const ssidData = this.stringToUint8Array(ssid);
     await this.sendDataFrame(writeChar, this.DATA_SUBTYPE.WIFI_SSID, ssidData);
     await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // 3. 发送密码
     this.sendLog(`🔐 发送密码: ${'*'.repeat(password.length)}`);
-    const passwordData = this.stringToUint8Array(password);
-    await this.sendDataFrame(writeChar, this.DATA_SUBTYPE.WIFI_PASSWORD, passwordData);
+    const pwdData = this.stringToUint8Array(password);
+    await this.sendDataFrame(writeChar, this.DATA_SUBTYPE.WIFI_PASSWORD, pwdData);
     await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // 4. 连接WiFi
     this.sendLog('🔗 发送连接WiFi命令');
     await this.sendCtrlFrame(writeChar, this.CTRL_SUBTYPE.CONNECT_WIFI, new Uint8Array([]));
-    
-    this.sendLog('✅ WiFi配网命令已发送');
   }
 
   // 主配网流程
@@ -454,24 +380,11 @@ class BluFiService {
       this.sendLog('⚠️ 没有连接的设备需要断开');
       return;
     }
-
     const { device } = this.currentConnection;
-
-    // 模拟模式
-    if (!noble || device.id.startsWith('mock-')) {
-      this.sendLog('⚠️ 模拟断开连接');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      this.sendLog('🔌 模拟设备已断开连接');
-      this.currentConnection = null;
-      return;
-    }
-
-    // 真实设备断开
     if (device && device.peripheral) {
       device.peripheral.disconnect();
       this.sendLog('🔌 设备已断开连接');
     }
-    
     this.currentConnection = null;
   }
 

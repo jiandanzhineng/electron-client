@@ -25,6 +25,7 @@
 | QIYA | pressure_sensor | 气压传感器 | 是 | 检测括约肌压力变化 |
 | TD01 | motor_controller | 偏轴电机控制器 | 是 | 提供可调节强度的刺激 |
 | DIANJI | shock_device | 电击设备 | 否 | 压力过高时的警示电击 |
+| ZIDONGSUO | auto_lock | 自动锁设备 | 否 | 游戏开始时锁定，结束时解锁 |
 
 ## 游戏参数配置
 

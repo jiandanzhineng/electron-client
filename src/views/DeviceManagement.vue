@@ -179,20 +179,26 @@
                   placeholder="请输入WiFi名称"
                 >
               </div>
-              <div class="form-group">
+              <div class="form-group password-group">
                 <label for="wifiPassword">WiFi密码:</label>
-                <input 
-                  id="wifiPassword" 
-                  v-model="deviceStore.wifiConfig.password" 
-                  type="password" 
-                  required 
-                  placeholder="请输入WiFi密码"
-                >
-              </div>
-              <div class="wifi-actions">
-                <button @click="editWifiConfig" class="btn btn-secondary btn-sm">
-                  修改配置
-                </button>
+                <div class="password-input-wrapper">
+                  <input 
+                    id="wifiPassword" 
+                    v-model="deviceStore.wifiConfig.password" 
+                    :type="showWifiPassword ? 'text' : 'password'" 
+                    required 
+                    placeholder="请输入WiFi密码"
+                  >
+                  <button 
+                    type="button" 
+                    class="toggle-visibility-btn" 
+                    @click="showWifiPassword = !showWifiPassword" 
+                    :aria-label="showWifiPassword ? '隐藏密码' : '显示密码'"
+                  >
+                    <span v-if="showWifiPassword">🙈</span>
+                    <span v-else>👁️</span>
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -208,7 +214,7 @@
           
           <div v-else-if="!deviceStore.configSuccess" class="config-progress">
             <div class="progress-header">
-              <h4>正在配网...约需要15秒</h4>
+              <h4>正在初始化蓝牙并扫描设备...(约需要15秒)</h4>
               <div class="countdown">
                 剩余时间: {{ deviceStore.configCountdown }}秒
               </div>
@@ -247,9 +253,6 @@
             </div>
             
             <div class="success-actions">
-              <button @click="restartConfig" class="btn btn-primary">
-                再次配网
-              </button>
               <button @click="finishConfig" class="btn btn-secondary">
                 结束配网
               </button>
@@ -280,6 +283,7 @@ const serviceStore = useServiceStore()
 const showConfigModal = ref(false)
 const showMonitorModal = ref(false)
 const monitorDevice = ref(null)
+const showWifiPassword = ref(false)
 
 // 编辑相关状态
 const isEditing = ref(false)
@@ -944,6 +948,30 @@ function getBatteryLevelClass(battery) {
 .wifi-actions {
   margin-top: 15px;
   text-align: right;
+}
+
+/* 密码显示切换样式优化 */
+.password-input-wrapper {
+  position: relative;
+}
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 40px;
+}
+.toggle-visibility-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #7f8c8d;
+  font-size: 18px;
+  line-height: 1;
+}
+.toggle-visibility-btn:hover {
+  color: #2c3e50;
 }
 
 .config-actions {
