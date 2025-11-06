@@ -123,8 +123,8 @@ export class PressureEdgingGame {
         min: 1,
         max: 255,
         step: 1,
-        default: 200,
-        description: 'TD01电机控制器的最大输出强度'
+        default: 50,
+        description: 'TD01电机控制器的最大输出强度(男用小td由于电流较大请勿超过50)'
       },
       lowPressureDelay: {
         name: '压力低时延迟刺激时间',
@@ -141,8 +141,8 @@ export class PressureEdgingGame {
         min: 1,
         max: 50,
         step: 1,
-        default: 10,
-        description: '刺激强度每秒变化不超过此值'
+        default: 1,
+        description: '刺激强度每秒变化不超过此值(男用小td由于电流较大请勿超过3)'
       },
       pressureSensitivity: {
         name: '压力变化敏感度系数',
